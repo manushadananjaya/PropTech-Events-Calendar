@@ -43,22 +43,25 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   }, [currentDate]);
 
   const fetchEvents = async () => {
-    const startOfMonthDate = startOfMonth(currentDate);
-    const endOfMonthDate = endOfMonth(currentDate);
+    const startOfMonthDate = format(startOfMonth(currentDate), "yyyy-MM-dd");
+    const endOfMonthDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
+
+    console.log("Fetching events for", startOfMonthDate, endOfMonthDate);
 
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .or(
-        `startDate.gte.${startOfMonthDate.toISOString()},endDate.lte.${endOfMonthDate.toISOString()}`
-      );
+      .gte("startDate", startOfMonthDate)
+      .lte("endDate", endOfMonthDate);
 
     if (error) {
       console.error("Error fetching events:", error);
     } else {
       setEvents(data || []);
+      console.log("Fetched events:", data);
     }
   };
+
 
   const handlePrevMonth = () => {
     setCurrentDate(
