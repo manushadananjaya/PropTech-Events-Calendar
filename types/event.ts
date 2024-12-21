@@ -13,3 +13,6 @@ export interface Event {
     publicUrl?: string;
   };
 }
+
+
+export type AccessLevel = "admin" | "edit" | "readonly" | "user";
