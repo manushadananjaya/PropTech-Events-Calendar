@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -10,11 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { File } from "lucide-react";
 
 interface EventModalProps {
   event: Event | null;
   onClose: () => void;
-  onSave: (event: Event) => void;
+  onSave: (event: Event) => Promise<void>;
   canEdit: boolean;
 }
 
@@ -28,18 +31,64 @@ const EventModal: React.FC<EventModalProps> = ({
     event || {
       id: "",
       name: "",
-      startDate: "",
-      endDate: "",
+      startdate: new Date().toISOString(),
+      enddate: new Date().toISOString(),
       cost: "",
       location: "",
     }
   );
   const [file, setFile] = useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentInfo, setAttachmentInfo] = useState<{
+    path: string;
+    filename: string;
+  } | null>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     if (event) {
       setEditedEvent(event);
+      console.log("Event:", event);
+
+      // Parse attachment JSON if it exists
+      if (typeof event.attachment === "string") {
+        try {
+          const parsedAttachment = JSON.parse(event.attachment);
+          if (parsedAttachment.path && parsedAttachment.filename) {
+            setAttachmentInfo({
+              path: parsedAttachment.path,
+              filename: parsedAttachment.filename,
+            });
+
+            // Generate public URL for attachment
+            const { data } = supabase.storage
+              .from("event-attachments")
+              .getPublicUrl(parsedAttachment.path);
+
+            setAttachmentUrl(data?.publicUrl || null);
+            console.log("Attachment URL:", data?.publicUrl);
+          }
+        } catch (error) {
+          console.error("Error parsing attachment JSON:", error);
+        }
+      } else if (
+        event.attachment &&
+        event.attachment.path &&
+        event.attachment.filename
+      ) {
+        setAttachmentInfo({
+          path: event.attachment.path,
+          filename: event.attachment.filename,
+        });
+
+        // Generate public URL for attachment
+        const { data } = supabase.storage
+          .from("event-attachments")
+          .getPublicUrl(event.attachment.path);
+
+        setAttachmentUrl(data?.publicUrl || null);
+        console.log("Attachment URL:", data?.publicUrl);
+      }
     }
   }, [event]);
 
@@ -58,22 +107,32 @@ const EventModal: React.FC<EventModalProps> = ({
     e.preventDefault();
     const updatedEvent = { ...editedEvent };
 
-    if (file) {
-      const { data, error } = await supabase.storage
-        .from("event-attachments")
-        .upload(`${editedEvent.id}/${file.name}`, file);
+    try {
+      if (file) {
+        const { data, error } = await supabase.storage
+          .from("event-attachments")
+          .upload(`${crypto.randomUUID()}/${file.name}`, file);
 
-      if (error) {
-        console.error("Error uploading file:", error);
-      } else if (data) {
-        updatedEvent.attachment = {
-          path: data.path,
-          filename: file.name,
-        };
+        if (error) {
+          throw new Error(`File upload failed: ${error.message}`);
+        }
+
+        if (data?.path) {
+          updatedEvent.attachment = {
+            path: data.path,
+            filename: file.name,
+          };
+        }
       }
-    }
 
-    onSave(updatedEvent);
+      // Ensure the ID is null for new events to let Supabase generate one
+      updatedEvent.id = updatedEvent.id || null;
+
+      await onSave(updatedEvent);
+    } catch (saveError) {
+      console.error("Error saving event:", saveError);
+      alert(`Error saving event || "Unknown error"}`);
+    }
   };
 
   return (
@@ -99,9 +158,11 @@ const EventModal: React.FC<EventModalProps> = ({
               <Label htmlFor="startDate">Start Date</Label>
               <Input
                 id="startDate"
-                name="startDate"
+                name="startdate"
                 type="datetime-local"
-                value={editedEvent.startDate.split(".")[0]}
+                value={new Date(editedEvent.startdate)
+                  .toISOString()
+                  .slice(0, 16)}
                 onChange={handleChange}
                 required
                 disabled={!canEdit}
@@ -111,9 +172,9 @@ const EventModal: React.FC<EventModalProps> = ({
               <Label htmlFor="endDate">End Date</Label>
               <Input
                 id="endDate"
-                name="endDate"
+                name="enddate"
                 type="datetime-local"
-                value={editedEvent.endDate.split(".")[0]}
+                value={new Date(editedEvent.enddate).toISOString().slice(0, 16)}
                 onChange={handleChange}
                 required
                 disabled={!canEdit}
@@ -139,21 +200,39 @@ const EventModal: React.FC<EventModalProps> = ({
                 disabled={!canEdit}
               />
             </div>
+            {attachmentInfo && (
+              <div className="mt-4 p-4 bg-gray-100 rounded-md">
+                <h3 className="text-lg font-semibold mb-2">Attachment</h3>
+                <div className="flex items-center gap-2">
+                  <File size={24} />
+                  <div>
+                    <p className="font-medium">{attachmentInfo.filename}</p>
+                    <a
+                      href={attachmentUrl || undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline text-sm"
+                    >
+                      View File
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
             {canEdit && (
               <div>
-                <Label htmlFor="file">Attachment</Label>
+                <Label htmlFor="file">Upload New Attachment</Label>
                 <Input
                   id="file"
                   name="file"
                   type="file"
                   onChange={handleFileChange}
                 />
-              </div>
-            )}
-            {editedEvent.attachment && (
-              <div>
-                <Label>Current Attachment</Label>
-                <p>{editedEvent.attachment.filename}</p>
+                {file && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    New file: {file.name}
+                  </p>
+                )}
               </div>
             )}
           </div>

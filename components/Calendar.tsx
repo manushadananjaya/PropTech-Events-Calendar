@@ -19,6 +19,7 @@ import EventModal from "./EventModal";
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Session } from "@supabase/supabase-js";
+import { v4 as uuidv4 } from "uuid";
 
 interface CalendarProps {
   initialSession: Session | null;
@@ -43,30 +44,23 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   }, [currentDate]);
 
   const fetchEvents = async () => {
-    const startOfMonthDate = format(startOfMonth(currentDate), "yyyy-MM-dd");
-    const endOfMonthDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
-
-    console.log("Querying events for:", startOfMonthDate, "to", endOfMonthDate);
+    const startOfMonthDate = startOfMonth(currentDate).toISOString();
+    const endOfMonthDate = endOfMonth(currentDate).toISOString();
 
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .lte("startDate", endOfMonthDate)
-      .gte("endDate", startOfMonthDate);
+      .lte("startdate", endOfMonthDate)
+      .gte("enddate", startOfMonthDate);
 
     if (error) {
       console.error("Error fetching events:", error);
       return;
     }
 
-    setEvents(data || []);
-    console.log("Fetched events:", data);
+    // Explicitly cast data as Event[] or set to an empty array if null
+    setEvents((data as Event[]) || []);
   };
-
-
-
-
-
 
   const handlePrevMonth = () => {
     setCurrentDate(
@@ -83,19 +77,37 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const handleDateClick = (date: Date) => {
     if (session) {
       setSelectedEvent({
-        id: "",
+        id: null,
         name: "",
-        startDate: date.toISOString(),
-        endDate: date.toISOString(),
+        startdate: date.toISOString(),
+        enddate: date.toISOString(),
         cost: "",
         location: "",
+        attachment: undefined,
       });
       setIsModalOpen(true);
     }
   };
 
-  const handleEventClick = (event: Event) => {
-    setSelectedEvent(event);
+  const handleEventClick = async (event: Event) => {
+    let updatedEvent = { ...event };
+    if (event.attachment?.path) {
+      const { data } = supabase.storage
+        .from("event-attachments")
+        .getPublicUrl(event.attachment.path);
+
+      if (data) {
+        updatedEvent = {
+          ...updatedEvent,
+          attachment: {
+            path: event.attachment.path,
+            filename: event.attachment.filename,
+            publicUrl: data.publicUrl,
+          },
+        };
+      }
+    }
+    setSelectedEvent(updatedEvent);
     setIsModalOpen(true);
   };
 
@@ -105,50 +117,49 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   };
 
   const handleSaveEvent = async (event: Event) => {
-    if (event.id) {
-      const { error } = await supabase
-        .from("events")
-        .update(event)
-        .eq("id", event.id);
+    try {
+      const { id, ...eventData } = event;
 
-      if (error) console.error("Error updating event:", error);
-    } else {
-      const { data, error } = await supabase
-        .from("events")
-        .insert(event)
-        .select();
+      if (id) {
+        console.log("Updating event with ID:", id);
+        const { error } = await supabase
+          .from("events")
+          .update(eventData)
+          .eq("id", id);
 
-      if (error) console.error("Error creating event:", error);
-      if (data) event.id = data[0].id;
+        if (error) throw error;
+      } else {
+        // Generate a UUID for the new event
+        const newEvent = {
+          id: uuidv4(), // Add a client-generated UUID
+          ...eventData,
+        };
+
+        console.log("Creating a new event:", newEvent);
+
+        const { error } = await supabase.from("events").insert(newEvent);
+
+        if (error) throw error;
+      }
+
+      await fetchEvents();
+      handleCloseModal();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Error saving event:", {
+          message: error.message,
+          stack: error.stack,
+        });
+      } else {
+        console.error("Unknown error occurred:", error);
+      }
     }
-
-    fetchEvents();
-    handleCloseModal();
   };
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentDate)),
     end: endOfWeek(endOfMonth(currentDate)),
   });
-
-  const getEventStyle = (event: Event, day: Date) => {
-    const start = parseISO(event.startDate);
-    const end = parseISO(event.endDate);
-    const isStart = isSameDay(day, start);
-    const isEnd = isSameDay(day, end);
-    const isMiddle =
-      isWithinInterval(day, { start, end }) && !isStart && !isEnd;
-
-    let style =
-      "text-sm p-1 mt-1 cursor-pointer flex items-center justify-between ";
-    if (isStart) style += "rounded-l-md ";
-    if (isEnd) style += "rounded-r-md ";
-    if (isMiddle) style += "rounded-none ";
-    if (isStart || isEnd) style += "bg-blue-200 ";
-    if (isMiddle) style += "bg-blue-100 ";
-
-    return style;
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -183,14 +194,14 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
             {events
               .filter((event) =>
                 isWithinInterval(day, {
-                  start: parseISO(event.startDate),
-                  end: parseISO(event.endDate),
+                  start: parseISO(event.startdate),
+                  end: parseISO(event.enddate),
                 })
               )
               .map((event) => (
                 <div
                   key={event.id}
-                  className={getEventStyle(event, day)}
+                  className="text-sm p-1 mt-1 cursor-pointer bg-blue-200 flex items-center gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleEventClick(event);
@@ -203,7 +214,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
           </div>
         ))}
       </div>
-      {isModalOpen && (
+      {isModalOpen && selectedEvent && (
         <EventModal
           event={selectedEvent}
           onClose={handleCloseModal}

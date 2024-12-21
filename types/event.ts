@@ -1,12 +1,13 @@
 export interface Event {
-  id: string;
+  id: string | null;
   name: string;
-  startDate: string;
-  endDate: string;
+  startdate: string;
+  enddate: string;
   cost: string;
   location: string;
   attachment?: {
-    path: string;
-    filename: string;
+    path: string | null;
+    filename: string | null;
+    publicUrl?: string;
   };
 }
