@@ -6,13 +6,15 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { File } from "lucide-react";
+import {  File } from "lucide-react";
 
 interface EventModalProps {
   event: Event | null;
@@ -39,10 +41,6 @@ const EventModal: React.FC<EventModalProps> = ({
   );
   const [file, setFile] = useState<File | null>(null);
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
-  const [attachmentInfo, setAttachmentInfo] = useState<{
-    path: string;
-    filename: string;
-  } | null>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
@@ -50,49 +48,22 @@ const EventModal: React.FC<EventModalProps> = ({
       setEditedEvent(event);
       console.log("Event:", event);
 
-      // Parse attachment JSON if it exists
-      if (typeof event.attachment === "string") {
-        try {
-          const parsedAttachment = JSON.parse(event.attachment);
-          if (parsedAttachment.path && parsedAttachment.filename) {
-            setAttachmentInfo({
-              path: parsedAttachment.path,
-              filename: parsedAttachment.filename,
-            });
-
-            // Generate public URL for attachment
-            const { data } = supabase.storage
-              .from("event-attachments")
-              .getPublicUrl(parsedAttachment.path);
-
-            setAttachmentUrl(data?.publicUrl || null);
-            console.log("Attachment URL:", data?.publicUrl);
-          }
-        } catch (error) {
-          console.error("Error parsing attachment JSON:", error);
-        }
-      } else if (
-        event.attachment &&
-        event.attachment.path &&
-        event.attachment.filename
-      ) {
-        setAttachmentInfo({
-          path: event.attachment.path,
-          filename: event.attachment.filename,
-        });
-
-        // Generate public URL for attachment
+      if (event.attachment?.path) {
         const { data } = supabase.storage
           .from("event-attachments")
           .getPublicUrl(event.attachment.path);
 
         setAttachmentUrl(data?.publicUrl || null);
         console.log("Attachment URL:", data?.publicUrl);
+      } else {
+        setAttachmentUrl(null);
       }
     }
   }, [event]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setEditedEvent((prev) => ({ ...prev, [name]: value }));
   };
@@ -117,45 +88,47 @@ const EventModal: React.FC<EventModalProps> = ({
           throw new Error(`File upload failed: ${error.message}`);
         }
 
-        if (data?.path) {
-          updatedEvent.attachment = {
-            path: data.path,
-            filename: file.name,
-          };
-        }
+        updatedEvent.attachment = {
+          path: data?.path || "",
+          filename: file.name,
+        };
       }
 
-      // Ensure the ID is null for new events to let Supabase generate one
       updatedEvent.id = updatedEvent.id || null;
 
       await onSave(updatedEvent);
     } catch (saveError) {
       console.error("Error saving event:", saveError);
-      alert(`Error saving event || "Unknown error"}`);
+      alert(`Error saving event: ${saveError}`);
     }
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{event?.id ? "Edit Event" : "Add Event"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Event Name</Label>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
               <Input
                 id="name"
                 name="name"
                 value={editedEvent.name}
                 onChange={handleChange}
+                className="col-span-3"
                 required
                 disabled={!canEdit}
               />
             </div>
-            <div>
-              <Label htmlFor="startDate">Start Date</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="startDate" className="text-right">
+                Start
+              </Label>
               <Input
                 id="startDate"
                 name="startdate"
@@ -164,83 +137,96 @@ const EventModal: React.FC<EventModalProps> = ({
                   .toISOString()
                   .slice(0, 16)}
                 onChange={handleChange}
+                className="col-span-3"
                 required
                 disabled={!canEdit}
               />
             </div>
-            <div>
-              <Label htmlFor="endDate">End Date</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="endDate" className="text-right">
+                End
+              </Label>
               <Input
                 id="endDate"
                 name="enddate"
                 type="datetime-local"
                 value={new Date(editedEvent.enddate).toISOString().slice(0, 16)}
                 onChange={handleChange}
+                className="col-span-3"
                 required
                 disabled={!canEdit}
               />
             </div>
-            <div>
-              <Label htmlFor="cost">Cost</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="cost" className="text-right">
+                Cost
+              </Label>
               <Input
                 id="cost"
                 name="cost"
                 value={editedEvent.cost}
                 onChange={handleChange}
+                className="col-span-3"
                 disabled={!canEdit}
               />
             </div>
-            <div>
-              <Label htmlFor="location">Location</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="location" className="text-right">
+                Location
+              </Label>
               <Input
                 id="location"
                 name="location"
                 value={editedEvent.location}
                 onChange={handleChange}
+                className="col-span-3"
                 disabled={!canEdit}
               />
             </div>
-            {attachmentInfo && (
-              <div className="mt-4 p-4 bg-gray-100 rounded-md">
-                <h3 className="text-lg font-semibold mb-2">Attachment</h3>
-                <div className="flex items-center gap-2">
-                  <File size={24} />
-                  <div>
-                    <p className="font-medium">{attachmentInfo.filename}</p>
-                    <a
-                      href={attachmentUrl || undefined}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline text-sm"
-                    >
-                      View File
-                    </a>
-                  </div>
+            {editedEvent.attachment && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Attachment</Label>
+                <div className="col-span-3 flex items-center gap-2 bg-muted p-2 rounded-md">
+                  <File size={16} />
+                  <a
+                    href={attachmentUrl || undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-500 hover:underline truncate"
+                  >
+                    {editedEvent.attachment.filename || "View Attachment"}
+                  </a>
                 </div>
               </div>
             )}
             {canEdit && (
-              <div>
-                <Label htmlFor="file">Upload New Attachment</Label>
-                <Input
-                  id="file"
-                  name="file"
-                  type="file"
-                  onChange={handleFileChange}
-                />
-                {file && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    New file: {file.name}
-                  </p>
-                )}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="file" className="text-right">
+                  New Attachment
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="file"
+                    name="file"
+                    type="file"
+                    onChange={handleFileChange}
+                  />
+                  {file && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      New file: {file.name}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
-          {canEdit && (
-            <Button type="submit" className="mt-4">
-              Save Event
-            </Button>
-          )}
+          <DialogFooter>
+            {canEdit && (
+              <Button type="submit">
+                {event?.id ? "Update Event" : "Create Event"}
+              </Button>
+            )}
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -12,9 +12,12 @@ import {
   isSameDay,
   isWithinInterval,
   parseISO,
+  addMonths,
+  subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
+import { ChevronLeft, ChevronRight, Paperclip, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import EventModal from "./EventModal";
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
@@ -58,20 +61,15 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
       return;
     }
 
-    // Explicitly cast data as Event[] or set to an empty array if null
     setEvents((data as Event[]) || []);
   };
 
   const handlePrevMonth = () => {
-    setCurrentDate(
-      (prevDate) => new Date(prevDate.getFullYear(), prevDate.getMonth() - 1, 1)
-    );
+    setCurrentDate((prevDate) => subMonths(prevDate, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(
-      (prevDate) => new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 1)
-    );
+    setCurrentDate((prevDate) => addMonths(prevDate, 1));
   };
 
   const handleDateClick = (date: Date) => {
@@ -129,9 +127,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
         if (error) throw error;
       } else {
-        // Generate a UUID for the new event
         const newEvent = {
-          id: uuidv4(), // Add a client-generated UUID
+          id: uuidv4(),
           ...eventData,
         };
 
@@ -162,58 +159,71 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   });
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">
+    <Card className="w-full max-w-4xl mx-auto">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-2xl font-bold">
           {format(currentDate, "MMMM yyyy")}
-        </h2>
-        <div>
-          <Button onClick={handlePrevMonth}>
-            <ChevronLeft />
+        </CardTitle>
+        <div className="space-x-2">
+          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button onClick={handleNextMonth}>
-            <ChevronRight />
+          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day} className="text-center font-bold">
-            {day}
-          </div>
-        ))}
-        {days.map((day) => (
-          <div
-            key={day.toString()}
-            className={`p-2 border ${
-              isSameMonth(day, currentDate) ? "bg-white" : "bg-gray-100"
-            } ${isSameDay(day, new Date()) ? "border-blue-500" : ""}`}
-            onClick={() => handleDateClick(day)}
-          >
-            <div className="text-right">{format(day, "d")}</div>
-            {events
-              .filter((event) =>
-                isWithinInterval(day, {
-                  start: parseISO(event.startdate),
-                  end: parseISO(event.enddate),
-                })
-              )
-              .map((event) => (
-                <div
-                  key={event.id}
-                  className="text-sm p-1 mt-1 cursor-pointer bg-blue-200 flex items-center gap-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEventClick(event);
-                  }}
-                >
-                  <span>{event.name}</span>
-                  {event.attachment && <Paperclip size={12} />}
-                </div>
-              ))}
-          </div>
-        ))}
-      </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-7 gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div key={day} className="text-center font-semibold text-sm py-2">
+              {day}
+            </div>
+          ))}
+          {days.map((day) => (
+            <div
+              key={day.toString()}
+              className={`p-2 border rounded-md transition-colors ${
+                isSameMonth(day, currentDate)
+                  ? "bg-background hover:bg-accent"
+                  : "bg-muted text-muted-foreground"
+              } ${
+                isSameDay(day, new Date()) ? "border-primary" : "border-border"
+              }`}
+              onClick={() => handleDateClick(day)}
+            >
+              <div className="text-right text-sm">{format(day, "d")}</div>
+              <div className="mt-1 space-y-1">
+                {events
+                  .filter((event) =>
+                    isWithinInterval(day, {
+                      start: parseISO(event.startdate),
+                      end: parseISO(event.enddate),
+                    })
+                  )
+                  .map((event) => (
+                    <div
+                      key={event.id}
+                      className="text-xs p-1 rounded-sm cursor-pointer bg-primary/70 text-primary-foreground flex items-center gap-1 truncate"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEventClick(event);
+                      }}
+                    >
+                      <span className="truncate">{event.name}</span>
+                      {event.attachment && <Paperclip size={10} />}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {session && (
+          <Button className="mt-4" onClick={() => handleDateClick(new Date())}>
+            <Plus className="mr-2 h-4 w-4" /> Add Event
+          </Button>
+        )}
+      </CardContent>
       {isModalOpen && selectedEvent && (
         <EventModal
           event={selectedEvent}
@@ -222,7 +232,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
           canEdit={!!session}
         />
       )}
-    </div>
+    </Card>
   );
 };
 
