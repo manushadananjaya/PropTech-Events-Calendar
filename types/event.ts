@@ -5,6 +5,8 @@ export interface Event {
   enddate: string;
   cost: string;
   location: string;
+  createdBy: string;
+  accessLevel: "admin" | "edit" | "readonly";
   attachment?: {
     path: string | null;
     filename: string | null;
