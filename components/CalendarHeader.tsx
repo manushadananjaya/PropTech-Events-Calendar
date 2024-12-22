@@ -1,3 +1,4 @@
+// CalendarHeader.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -16,43 +17,27 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { User } from "@supabase/supabase-js";
 import { Calendar, LogOut, Download, Upload } from "lucide-react";
 import { Event } from "@/types/event";
+import { create } from "zustand";
+
+// Create a global store for user role
+interface UserStore {
+  userRole: string | null;
+  setUserRole: (role: string | null) => void;
+}
+
+export const useUserStore = create<UserStore>((set) => ({
+  userRole: null,
+  setUserRole: (role) => set({ userRole: role }),
+}));
 
 const CalendarHeader: React.FC = () => {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        console.log("User from header:", user);
-        await createAdminUserIfNotExists(user);
-      }
-    };
-
-    fetchUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await createAdminUserIfNotExists(session.user);
-        }
-      }
-    );
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
+  const setUserRole = useUserStore((state) => state.setUserRole);
 
   const createAdminUserIfNotExists = async (user: User) => {
     try {
-      // Check if the user already exists in the `users` table
       const { data: existingUser, error: fetchError } = await supabase
         .from("users")
         .select("*")
@@ -64,29 +49,64 @@ const CalendarHeader: React.FC = () => {
         return;
       }
 
-      // If the user does not exist, insert them into the `users` table
       if (!existingUser) {
-        // Check if this is the first user (make them admin)
         const { count: usersCount } = await supabase
           .from("users")
           .select("id", { count: "exact" });
 
         const isFirstUser = usersCount === 0;
+        const role = isFirstUser ? "admin" : "user";
 
         const { error: insertError } = await supabase.from("users").insert({
-          id: user.id, // Supabase Auth user ID
-          email: user.email, // Supabase Auth user email
-          role: isFirstUser ? "admin" : "user", // Assign "admin" to the first user
+          id: user.id,
+          email: user.email,
+          role: role,
         });
 
         if (insertError) {
           console.error("Error creating user:", insertError);
+        } else {
+          // Set the role in global state
+          setUserRole(role);
         }
+      } else {
+        // Set existing user's role in global state
+        setUserRole(existingUser.role);
       }
     } catch (error) {
       console.error("Unexpected error:", error);
     }
   };
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+      if (user) {
+        await createAdminUserIfNotExists(user);
+      }
+    };
+
+    fetchUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await createAdminUserIfNotExists(session.user);
+        } else {
+          setUserRole(null);
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
+
 
   const handleSignIn = async () => {
     await supabase.auth.signInWithOAuth({

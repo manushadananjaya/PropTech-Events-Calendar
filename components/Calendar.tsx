@@ -22,6 +22,7 @@ import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Session, User } from "@supabase/supabase-js";
 import { v4 as uuidv4 } from "uuid";
+import { useUserStore } from "./CalendarHeader";
 
 const ACCESS_LEVELS = {
   ADMIN: "admin",
@@ -40,8 +41,9 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const userRole = useUserStore((state) => state.userRole);
   const supabase = createClientComponentClient();
+
 
   const fetchEvents = async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
@@ -60,28 +62,9 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
     setEvents((data as Event[]) || []);
   };
+  
 
   useEffect(() => {
-    const fetchUserRoleAndEvents = async () => {
-      if (user?.id) {
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (userError) {
-          console.error("Error fetching user role:", userError);
-        } else {
-          setUserRole(userData?.role || null);
-        }
-      }
-
-      await fetchEvents();
-    };
-
-    fetchUserRoleAndEvents();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -89,7 +72,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, user?.id]);
+  }, [supabase]);
 
   useEffect(() => {
     fetchEvents();
