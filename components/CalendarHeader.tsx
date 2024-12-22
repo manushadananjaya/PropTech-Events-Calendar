@@ -36,48 +36,6 @@ const CalendarHeader: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const setUserRole = useUserStore((state) => state.setUserRole);
 
-  const createAdminUserIfNotExists = async (user: User) => {
-    try {
-      const { data: existingUser, error: fetchError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (fetchError && fetchError.code !== "PGRST116") {
-        console.error("Error fetching user:", fetchError);
-        return;
-      }
-
-      if (!existingUser) {
-        const { count: usersCount } = await supabase
-          .from("users")
-          .select("id", { count: "exact" });
-
-        const isFirstUser = usersCount === 0;
-        const role = isFirstUser ? "admin" : "user";
-
-        const { error: insertError } = await supabase.from("users").insert({
-          id: user.id,
-          email: user.email,
-          role: role,
-        });
-
-        if (insertError) {
-          console.error("Error creating user:", insertError);
-        } else {
-          // Set the role in global state
-          setUserRole(role);
-        }
-      } else {
-        // Set existing user's role in global state
-        setUserRole(existingUser.role);
-      }
-    } catch (error) {
-      console.error("Unexpected error:", error);
-    }
-  };
-
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -106,6 +64,54 @@ const CalendarHeader: React.FC = () => {
       authListener.subscription.unsubscribe();
     };
   }, [supabase.auth]);
+
+  const createAdminUserIfNotExists = async (user: User) => {
+    try {
+      const { data: existingUser, error: fetchError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        console.error("Error fetching user:", fetchError);
+        return;
+      }
+
+      console.log("Existing user:",existingUser);
+      
+
+      if (!existingUser) {
+        console.log("Creating new user:", user);
+        const { count: usersCount } = await supabase
+          .from("users")
+          .select("id", { count: "exact" });
+
+        const isFirstUser = usersCount === 0;
+        const role = isFirstUser ? "admin" : "user";
+
+        const { error: insertError } = await supabase.from("users").insert({
+          id: user.id,
+          email: user.email,
+          role: role,
+        });
+
+        if (insertError) {
+          console.error("Error creating user:", insertError);
+        } else {
+          // Set the role in global state
+          setUserRole(role);
+        }
+      } else {
+        // Set existing user's role in global state
+        setUserRole(existingUser.role);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    }
+  };
+
+  
 
 
   const handleSignIn = async () => {
