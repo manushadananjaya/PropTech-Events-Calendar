@@ -20,6 +20,7 @@ import { Event } from "@/types/event";
 import { create } from "zustand";
 
 // Create a global store for user role
+// Zustand store to manage user role
 interface UserStore {
   userRole: string | null;
   setUserRole: (role: string | null) => void;
@@ -36,97 +37,99 @@ const CalendarHeader: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const setUserRole = useUserStore((state) => state.setUserRole);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        await createAdminUserIfNotExists(user);
-      }
-    };
+ useEffect(() => {
+   const initializeUser = async () => {
+     const {
+       data: { user },
+     } = await supabase.auth.getUser();
 
-    fetchUser();
+     if (user) {
+       setUser(user);
+       await checkAndHandleUserRole(user); // Ensure role logic is handled
+     }
+   };
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await createAdminUserIfNotExists(session.user);
-        } else {
-          setUserRole(null);
-        }
-      }
-    );
+   const checkAndHandleUserRole = async (user: User) => {
+     try {
+       // Check if user exists
+       const { data: existingUser, error } = await supabase
+         .from("users")
+         .select("id, role")
+         .eq("id", user.id)
+         .single();
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
+       if (error && error.code !== "PGRST116") {
+         console.error("Error fetching user role:", error);
+         return;
+       }
 
-  const createAdminUserIfNotExists = async (user: User) => {
-    try {
-      const { data: existingUser, error: fetchError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+       if (existingUser) {
+         setUserRole(existingUser.role); // Set the role if user exists
+       } else {
+         // Insert the user if not found
+         const { count } = await supabase
+           .from("users")
+           .select("id", { count: "exact" });
 
-      if (fetchError && fetchError.code !== "PGRST116") {
-        console.error("Error fetching user:", fetchError);
-        return;
-      }
+         const role = count === 0 ? "admin" : "user";
 
-      console.log("Existing user:",existingUser);
-      
+         const { error: insertError } = await supabase.from("users").insert({
+           id: user.id,
+           email: user.email,
+           role,
+         });
 
-      if (!existingUser) {
-        console.log("Creating new user:", user);
-        const { count: usersCount } = await supabase
-          .from("users")
-          .select("id", { count: "exact" });
+         if (insertError) {
+           if (insertError.code === "23505") {
+             console.warn("User already exists, skipping insertion.");
+           } else {
+             console.error("Error inserting new user:", insertError);
+           }
+           return;
+         }
 
-        const isFirstUser = usersCount === 0;
-        const role = isFirstUser ? "admin" : "user";
+         setUserRole(role); // Set the role after insertion
+       }
+     } catch (error) {
+       console.error("Unexpected error handling user role:", error);
+     }
+   };
 
-        const { error: insertError } = await supabase.from("users").insert({
-          id: user.id,
-          email: user.email,
-          role: role,
-        });
+   initializeUser();
 
-        if (insertError) {
-          console.error("Error creating user:", insertError);
-        } else {
-          // Set the role in global state
-          setUserRole(role);
-        }
-      } else {
-        // Set existing user's role in global state
-        setUserRole(existingUser.role);
-      }
-    } catch (error) {
-      console.error("Unexpected error:", error);
-    }
-  };
+   const { data: authListener } = supabase.auth.onAuthStateChange(
+     async (event, session) => {
+       const currentUser = session?.user ?? null;
+       if (currentUser) {
+         setUser(currentUser);
+         await checkAndHandleUserRole(currentUser); // Avoid duplicate logic
+       } else {
+         setUser(null);
+         setUserRole(null);
+       }
+     }
+   );
 
-  
+   return () => {
+     authListener.subscription.unsubscribe();
+   };
+ }, [supabase, setUserRole]);
 
 
-  const handleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  };
+ const handleSignIn = async () => {
+   await supabase.auth.signInWithOAuth({
+     provider: "google",
+     options: {
+       redirectTo: `${window.location.origin}/auth/callback`,
+     },
+   });
+ };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
-  };
+ const handleSignOut = async () => {
+   await supabase.auth.signOut();
+   router.refresh();
+ };
+
 
   const handleExportCalendar = async () => {
     const { data: events, error } = await supabase.from("events").select("*");

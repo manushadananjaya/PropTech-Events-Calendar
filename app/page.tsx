@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Calendar from "@/components/Calendar";
 import CalendarHeader from "@/components/CalendarHeader";
 import AdminPanel from "@/components/AdminPanel";
+import { useUserStore } from "@/components/CalendarHeader";
 
 export default async function Home() {
   const supabase = createServerComponentClient({ cookies });
@@ -22,7 +23,7 @@ export default async function Home() {
         .from("users")
         .select("role")
         .eq("id", session.user.id)
-        .maybeSingle(); // Use maybeSingle to avoid the error
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching user role:", error.message);
@@ -36,6 +37,11 @@ export default async function Home() {
     }
   }
 
+  // Update the Zustand store with the user's role
+  if (typeof window !== "undefined") {
+    const { setUserRole } = useUserStore.getState(); // Access `setUserRole` correctly
+    setUserRole(isAdmin ? "admin" : "user");
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
