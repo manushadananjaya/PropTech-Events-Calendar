@@ -209,7 +209,7 @@ const EventModal: React.FC<EventModalProps> = ({
                   .toISOString()
                   .slice(0, 16)}
                 onChange={handleChange}
-                className="col-span-3"
+                className="col-span-3"  
                 required
                 disabled={!canEdit || isLoading}
               />

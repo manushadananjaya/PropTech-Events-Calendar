@@ -185,8 +185,9 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const canEditEvent = (event: Event) => {
     if (!user || !userRole) return false;
 
+    // Allow editing admin-level events only for admin users
     if (event.accessLevel === ACCESS_LEVELS.ADMIN) {
-      return false; // Users cannot edit admin-level events
+      return userRole === ACCESS_LEVELS.ADMIN;
     }
 
     return (
@@ -195,6 +196,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
       userRole === ACCESS_LEVELS.USER
     );
   };
+
 
   const canViewEvent = (event: Event) => {
     if (!user || !userRole)
