@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   Table,
@@ -28,11 +28,7 @@ const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("users")
@@ -45,7 +41,11 @@ const AdminPanel: React.FC = () => {
     } catch (err) {
       console.error("Unexpected error fetching users:", err);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleUpdateUserRole = async (userId: string, newRole: string) => {
     try {

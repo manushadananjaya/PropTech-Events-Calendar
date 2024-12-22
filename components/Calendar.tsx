@@ -43,6 +43,45 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
+  // const fetchUserRole = async () => {
+  //   if (user?.id) {
+  //     const { data, error } = await supabase
+  //       .from("users")
+  //       .select("role")
+  //       .eq("id", user.id)
+  //       .single();
+
+  //     if (error) {
+  //       console.error("Error fetching user role:", error);
+  //       return;
+  //     }
+
+  //     setUserRole(data?.role || null);
+  //   }
+  // };
+
+  const memoizedFetchEvents = React.useCallback(() => {
+    const fetchEvents = async () => {
+      const startOfMonthDate = startOfMonth(currentDate).toISOString();
+      const endOfMonthDate = endOfMonth(currentDate).toISOString();
+
+      const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .lte("startdate", endOfMonthDate)
+        .gte("enddate", startOfMonthDate);
+
+      if (error) {
+        console.error("Error fetching events:", error);
+        return;
+      }
+
+      setEvents((data as Event[]) || []);
+    };
+
+    fetchEvents();
+  }, [currentDate, supabase]);
+
   useEffect(() => {
     const fetchUserRole = async () => {
       if (user?.id) {
@@ -62,7 +101,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
     };
 
     fetchUserRole();
-    fetchEvents();
+    memoizedFetchEvents();
 
     const {
       data: { subscription },
@@ -71,7 +110,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [currentDate, user]);
+  }, [memoizedFetchEvents, supabase, user?.id]);
+ // Add fetchUserRole
 
   const fetchEvents = async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
@@ -198,20 +238,32 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
   const canEditEvent = (event: Event) => {
     if (!user || !userRole) return false;
+
+    if (event.accessLevel === ACCESS_LEVELS.ADMIN) {
+      return false; // Users cannot edit admin-level events
+    }
+
     return (
       userRole === ACCESS_LEVELS.ADMIN ||
-      (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) || userRole === ACCESS_LEVELS.USER
+      (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) ||
+      userRole === ACCESS_LEVELS.USER
     );
   };
 
   const canViewEvent = (event: Event) => {
-    if (!user || !userRole) return event.accessLevel === ACCESS_LEVELS.READONLY || event.accessLevel === ACCESS_LEVELS.EDIT || event.accessLevel === ACCESS_LEVELS.ADMIN;
+    if (!user || !userRole)
+      return (
+        event.accessLevel === ACCESS_LEVELS.READONLY ||
+        event.accessLevel === ACCESS_LEVELS.EDIT ||
+        event.accessLevel === ACCESS_LEVELS.ADMIN
+      );
     return (
       userRole === ACCESS_LEVELS.ADMIN ||
       userRole === ACCESS_LEVELS.EDIT ||
-      userRole === ACCESS_LEVELS.READONLY || 
+      userRole === ACCESS_LEVELS.READONLY ||
       event.accessLevel === ACCESS_LEVELS.READONLY ||
-      event.accessLevel === ACCESS_LEVELS.EDIT
+      event.accessLevel === ACCESS_LEVELS.EDIT ||
+      event.accessLevel === ACCESS_LEVELS.ADMIN
     );
   };
 

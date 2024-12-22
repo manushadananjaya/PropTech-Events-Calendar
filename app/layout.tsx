@@ -19,16 +19,15 @@ export const metadata: Metadata = {
     "An embeddable calendar for PropTech AG team members and external parties",
 };
 
-// Generate a script to dynamically apply the theme
-const themeScript = `
-  (function() {
-    var colors = ${JSON.stringify(colors)};
-    document.documentElement.style.setProperty("--color-primary", colors.primary);
-    document.documentElement.style.setProperty("--color-secondary", colors.secondary);
-    document.documentElement.style.setProperty("--color-accent", colors.accent);
-    document.documentElement.style.setProperty("--color-background", colors.background);
-    document.documentElement.style.setProperty("--color-text", colors.text);
-  })();
+// Generate CSS variables dynamically
+const themeStyle = `
+  :root {
+    --color-primary: ${colors.primary};
+    --color-secondary: ${colors.secondary};
+    --color-accent: ${colors.accent};
+    --color-background: ${colors.background};
+    --color-text: ${colors.text};
+  }
 `;
 
 export default function RootLayout({
@@ -39,7 +38,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Add inline style for the theme */}
+        <style>{themeStyle}</style>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

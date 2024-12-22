@@ -1,13 +1,15 @@
 import { createEvents, EventAttributes } from "ics";
 import { Event } from "@/types/event";
 import { supabase } from "@/lib/supabase";
-import { parseISO} from "date-fns";
+import { parseISO } from "date-fns";
 
 export const exportToICS = async (events: Event[]): Promise<string> => {
   const icsEvents: EventAttributes[] = await Promise.all(
     events.map(async (event) => {
       let attachment;
-      if (event.attachment) {
+
+      // Ensure event.attachment and event.attachment.path are valid
+      if (event.attachment && event.attachment.path) {
         const { data, error } = await supabase.storage
           .from("event-attachments")
           .createSignedUrl(event.attachment.path, 60 * 60); // URL valid for 1 hour
@@ -20,11 +22,8 @@ export const exportToICS = async (events: Event[]): Promise<string> => {
         }
       }
 
-      const startDate = parseISO(event.startDate);
-      const endDate = parseISO(event.endDate);
-
-      // const durationHours = differenceInHours(endDate, startDate);
-      // const durationMinutes = differenceInMinutes(endDate, startDate) % 60;
+      const startDate = parseISO(event.startdate);
+      const endDate = parseISO(event.enddate);
 
       return {
         start: startDate.toISOString().split("T")[0].split("-").map(Number) as [
