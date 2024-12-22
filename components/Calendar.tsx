@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -18,7 +18,7 @@ import { ChevronLeft, ChevronRight, Plus, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import EventModal from "./EventModal";
-import { Event, AccessLevel } from "@/types/event";
+import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Session, User } from "@supabase/supabase-js";
 import { v4 as uuidv4 } from "uuid";
@@ -28,7 +28,7 @@ const ACCESS_LEVELS = {
   EDIT: "edit",
   READONLY: "readonly",
   USER: "user",
-} as const;
+};
 
 interface CalendarProps {
   initialSession: Session | null;
@@ -40,27 +40,40 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
-  const [userRole, setUserRole] = useState<AccessLevel | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
-  const fetchUserRole = useCallback(async () => {
-    if (user?.id) {
-      const { data, error } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
 
-      if (error) {
-        console.error("Error fetching user role:", error);
-        return;
+        if (error) {
+          console.error("Error fetching user role:", error);
+          return;
+        }
+
+        setUserRole(data?.role || null);
       }
+    };
 
-      setUserRole((data?.role as AccessLevel) || null);
-    }
-  }, [user, supabase]);
+    fetchUserRole();
+    fetchEvents();
 
-  const fetchEvents = useCallback(async () => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [currentDate, user]);
+
+  const fetchEvents = async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
     const endOfMonthDate = endOfMonth(currentDate).toISOString();
 
@@ -76,176 +89,137 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
     }
 
     setEvents((data as Event[]) || []);
-  }, [currentDate, supabase]);
+  };
 
-  useEffect(() => {
-    fetchUserRole();
-    fetchEvents();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [fetchUserRole, fetchEvents, supabase.auth]);
-
-  const canDeleteEvents = useCallback(() => {
-    return userRole === ACCESS_LEVELS.ADMIN;
-  }, [userRole]);
-
-  const handlePrevMonth = useCallback(() => {
+  const handlePrevMonth = () => {
     setCurrentDate((prevDate) => subMonths(prevDate, 1));
-  }, []);
+  };
 
-  const handleNextMonth = useCallback(() => {
+  const handleNextMonth = () => {
     setCurrentDate((prevDate) => addMonths(prevDate, 1));
-  }, []);
+  };
 
-  const handleDateClick = useCallback(
-    (date: Date) => {
-      if (!user) {
-        alert("You must be logged in to add events.");
-        return;
-      }
+  const handleDateClick = (date: Date) => {
+    if (!user) {
+      alert("You must be logged in to add events.");
+      return;
+    }
 
-      setSelectedEvent({
-        id: null,
-        name: "",
-        startdate: date.toISOString(),
-        enddate: date.toISOString(),
-        cost: "",
-        location: "",
-        createdBy: user.id,
-        accessLevel: ACCESS_LEVELS.EDIT,
-        attachment: undefined,
-      });
-      setIsModalOpen(true);
-    },
-    [user]
-  );
+    setSelectedEvent({
+      id: null,
+      name: "",
+      startdate: date.toISOString(),
+      enddate: date.toISOString(),
+      cost: "",
+      location: "",
+      createdBy: user.id,
+      accessLevel: ACCESS_LEVELS.EDIT as "admin" | "edit" | "readonly",
+      attachment: undefined,
+    });
+    setIsModalOpen(true);
+  };
 
-  const canViewEvent = useCallback(
-    (event: Event) => {
-      if (!user || !userRole)
-        return (
-          event.accessLevel === ACCESS_LEVELS.READONLY ||
-          event.accessLevel === ACCESS_LEVELS.EDIT ||
-          event.accessLevel === ACCESS_LEVELS.ADMIN
-        );
-      return (
-        userRole === ACCESS_LEVELS.ADMIN ||
-        userRole === ACCESS_LEVELS.EDIT ||
-        userRole === ACCESS_LEVELS.READONLY ||
-        event.accessLevel === ACCESS_LEVELS.READONLY ||
-        event.accessLevel === ACCESS_LEVELS.EDIT
-      );
-    },
-    [user, userRole]
-  );
+  const handleEventClick = async (event: Event) => {
+    if (canViewEvent(event)) {
+      let updatedEvent = { ...event };
+      if (event.attachment?.path) {
+        const { data } = supabase.storage
+          .from("event-attachments")
+          .getPublicUrl(event.attachment.path);
 
-  const handleEventClick = useCallback(
-    async (event: Event) => {
-      if (canViewEvent(event)) {
-        let updatedEvent = { ...event };
-        if (event.attachment?.path) {
-          const { data } = supabase.storage
-            .from("event-attachments")
-            .getPublicUrl(event.attachment.path);
-
-          if (data) {
-            updatedEvent = {
-              ...updatedEvent,
-              attachment: {
-                path: event.attachment.path,
-                filename: event.attachment.filename,
-                publicUrl: data.publicUrl,
-              },
-            };
-          }
+        if (data) {
+          updatedEvent = {
+            ...updatedEvent,
+            attachment: {
+              path: event.attachment.path,
+              filename: event.attachment.filename,
+              publicUrl: data.publicUrl,
+            },
+          };
         }
-        setSelectedEvent(updatedEvent);
-        setIsModalOpen(true);
       }
-    },
-    [supabase.storage, canViewEvent]
-  );
+      setSelectedEvent(updatedEvent);
+      setIsModalOpen(true);
+    }
+  };
 
-  const handleCloseModal = useCallback(() => {
+  const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedEvent(null);
-  }, []);
+  };
 
-  const handleSaveEvent = useCallback(
-    async (event: Event) => {
-      try {
-        const { id, ...eventData } = event;
+  const handleSaveEvent = async (event: Event) => {
+    try {
+      const { id, ...eventData } = event;
 
-        if (id) {
-          const { error } = await supabase
-            .from("events")
-            .update(eventData)
-            .eq("id", id);
-
-          if (error) throw error;
-        } else {
-          const newEvent = {
-            id: uuidv4(),
-            ...eventData,
-            createdBy: user?.id,
-          };
-
-          const { error } = await supabase.from("events").insert(newEvent);
-
-          if (error) throw error;
-        }
-
-        await fetchEvents();
-        handleCloseModal();
-      } catch (error) {
-        console.error("Error saving event:", error);
-      }
-    },
-    [supabase, user, fetchEvents, handleCloseModal]
-  );
-
-  const handleDeleteEvent = useCallback(
-    async (eventId: string) => {
-      if (!canDeleteEvents()) return;
-
-      try {
+      if (id) {
         const { error } = await supabase
           .from("events")
-          .delete()
-          .eq("id", eventId);
+          .update(eventData)
+          .eq("id", id);
 
         if (error) throw error;
+      } else {
+        const newEvent = {
+          id: uuidv4(),
+          ...eventData,
+          createdBy: user?.id,
+        };
 
-        await fetchEvents();
-        handleCloseModal();
-      } catch (error) {
-        console.error("Error deleting event:", error);
+        const { error } = await supabase.from("events").insert(newEvent);
+
+        if (error) throw error;
       }
-    },
-    [canDeleteEvents, supabase, fetchEvents, handleCloseModal]
-  );
 
-  const canEditEvent = useCallback(
-    (event: Event) => {
-      if (!user || !userRole) return false;
-      return (
-        userRole === ACCESS_LEVELS.ADMIN ||
-        (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) ||
-        userRole === ACCESS_LEVELS.USER
-      );
-    },
-    [user, userRole]
-  );
+      await fetchEvents();
+      handleCloseModal();
+    } catch (error) {
+      console.error("Error saving event:", error);
+    }
+  };
 
-  
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!canDeleteEvents()) return;
 
-  const getEventColor = useCallback((event: Event) => {
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventId);
+
+      if (error) throw error;
+
+      await fetchEvents();
+      handleCloseModal();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+    }
+  };
+
+  const canEditEvent = (event: Event) => {
+    if (!user || !userRole) return false;
+    return (
+      userRole === ACCESS_LEVELS.ADMIN ||
+      (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) || userRole === ACCESS_LEVELS.USER
+    );
+  };
+
+  const canViewEvent = (event: Event) => {
+    if (!user || !userRole) return event.accessLevel === ACCESS_LEVELS.READONLY || event.accessLevel === ACCESS_LEVELS.EDIT || event.accessLevel === ACCESS_LEVELS.ADMIN;
+    return (
+      userRole === ACCESS_LEVELS.ADMIN ||
+      userRole === ACCESS_LEVELS.EDIT ||
+      userRole === ACCESS_LEVELS.READONLY || 
+      event.accessLevel === ACCESS_LEVELS.READONLY ||
+      event.accessLevel === ACCESS_LEVELS.EDIT
+    );
+  };
+
+  const canDeleteEvents = () => {
+    return userRole === ACCESS_LEVELS.ADMIN;
+  };
+
+  const getEventColor = (event: Event) => {
     switch (event.accessLevel) {
       case ACCESS_LEVELS.ADMIN:
         return "bg-red-500";
@@ -256,7 +230,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
       default:
         return "bg-gray-500";
     }
-  }, []);
+  };
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentDate)),
@@ -333,8 +307,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
           onClose={handleCloseModal}
           onSave={
             canEditEvent(selectedEvent) ? handleSaveEvent : async () => {}
-          }
-          onDelete={canDeleteEvents() ? handleDeleteEvent : async () => {}}
+          } // Use a no-op function
+          onDelete={canDeleteEvents() ? handleDeleteEvent : undefined}
           canEdit={canEditEvent(selectedEvent)}
           isAdmin={userRole === ACCESS_LEVELS.ADMIN}
         />
