@@ -82,7 +82,7 @@ const EventModal: React.FC<EventModalProps> = ({
           console.error("Error fetching public URL:", error);
           setAttachmentUrl(null);
         } else {
-          console.log("Public URL data:", data);
+      
           setAttachmentUrl(data?.publicUrl || null);
         }
       } else {

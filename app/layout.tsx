@@ -3,6 +3,7 @@ import { Geist, Azeret_Mono as Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { colors } from "@/lib/theme";
 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -43,6 +44,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         {children}
       </body>

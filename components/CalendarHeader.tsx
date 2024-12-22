@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,47 +21,6 @@ const CalendarHeader: React.FC = () => {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [user, setUser] = useState<User | null>(null);
-
-  const createAdminUserIfNotExists = useCallback(
-    async (user: User) => {
-      try {
-        // Check if the user already exists in the `users` table
-        const { data: existingUser, error: fetchError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (fetchError && fetchError.code !== "PGRST116") {
-          console.error("Error fetching user:", fetchError);
-          return;
-        }
-
-        // If the user does not exist, insert them into the `users` table
-        if (!existingUser) {
-          // Check if this is the first user (make them admin)
-          const { count: usersCount } = await supabase
-            .from("users")
-            .select("id", { count: "exact" });
-
-          const isFirstUser = usersCount === 0;
-
-          const { error: insertError } = await supabase.from("users").insert({
-            id: user.id, // Supabase Auth user ID
-            email: user.email, // Supabase Auth user email
-            role: isFirstUser ? "admin" : "user", // Assign "admin" to the first user
-          });
-
-          if (insertError) {
-            console.error("Error creating user:", insertError);
-          }
-        }
-      } catch (error) {
-        console.error("Unexpected error:", error);
-      }
-    },
-    [supabase] // Dependency array
-  );
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -89,7 +48,45 @@ const CalendarHeader: React.FC = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [supabase, createAdminUserIfNotExists]);
+  }, [supabase.auth]);
+
+  const createAdminUserIfNotExists = async (user: User) => {
+    try {
+      // Check if the user already exists in the `users` table
+      const { data: existingUser, error: fetchError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        console.error("Error fetching user:", fetchError);
+        return;
+      }
+
+      // If the user does not exist, insert them into the `users` table
+      if (!existingUser) {
+        // Check if this is the first user (make them admin)
+        const { count: usersCount } = await supabase
+          .from("users")
+          .select("id", { count: "exact" });
+
+        const isFirstUser = usersCount === 0;
+
+        const { error: insertError } = await supabase.from("users").insert({
+          id: user.id, // Supabase Auth user ID
+          email: user.email, // Supabase Auth user email
+          role: isFirstUser ? "admin" : "user", // Assign "admin" to the first user
+        });
+
+        if (insertError) {
+          console.error("Error creating user:", insertError);
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    }
+  };
 
   const handleSignIn = async () => {
     await supabase.auth.signInWithOAuth({
@@ -259,12 +256,12 @@ END:VCALENDAR`;
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                Sign out
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button onClick={handleSignIn}>Sign in</Button>
+          <Button onClick={handleSignIn}>Sign In</Button>
         )}
       </div>
     </header>
