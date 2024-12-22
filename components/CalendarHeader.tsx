@@ -15,7 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { User } from "@supabase/supabase-js";
-import { Calendar, LogOut, Download, Upload } from "lucide-react";
+import { Calendar, LogOut, Download, Upload, Settings } from "lucide-react";
 import { Event } from "@/types/event";
 import { create } from "zustand";
 
@@ -35,100 +35,95 @@ const CalendarHeader: React.FC = () => {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [user, setUser] = useState<User | null>(null);
-  const setUserRole = useUserStore((state) => state.setUserRole);
+  const { userRole, setUserRole } = useUserStore();
 
- useEffect(() => {
-   const initializeUser = async () => {
-     const {
-       data: { user },
-     } = await supabase.auth.getUser();
+  useEffect(() => {
+    const initializeUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-     if (user) {
-       setUser(user);
-       await checkAndHandleUserRole(user); // Ensure role logic is handled
-     }
-   };
+      if (user) {
+        setUser(user);
+        await checkAndHandleUserRole(user);
+      }
+    };
 
-   const checkAndHandleUserRole = async (user: User) => {
-     try {
-       // Check if user exists
-       const { data: existingUser, error } = await supabase
-         .from("users")
-         .select("id, role")
-         .eq("id", user.id)
-         .single();
+    const checkAndHandleUserRole = async (user: User) => {
+      try {
+        const { data: existingUser, error } = await supabase
+          .from("users")
+          .select("id, role")
+          .eq("id", user.id)
+          .single();
 
-       if (error && error.code !== "PGRST116") {
-         console.error("Error fetching user role:", error);
-         return;
-       }
+        if (error && error.code !== "PGRST116") {
+          console.error("Error fetching user role:", error);
+          return;
+        }
 
-       if (existingUser) {
-         setUserRole(existingUser.role); // Set the role if user exists
-       } else {
-         // Insert the user if not found
-         const { count } = await supabase
-           .from("users")
-           .select("id", { count: "exact" });
+        if (existingUser) {
+          setUserRole(existingUser.role);
+        } else {
+          const { count } = await supabase
+            .from("users")
+            .select("id", { count: "exact" });
 
-         const role = count === 0 ? "admin" : "user";
+          const role = count === 0 ? "admin" : "user";
 
-         const { error: insertError } = await supabase.from("users").insert({
-           id: user.id,
-           email: user.email,
-           role,
-         });
+          const { error: insertError } = await supabase.from("users").insert({
+            id: user.id,
+            email: user.email,
+            role,
+          });
 
-         if (insertError) {
-           if (insertError.code === "23505") {
-             console.warn("User already exists, skipping insertion.");
-           } else {
-             console.error("Error inserting new user:", insertError);
-           }
-           return;
-         }
+          if (insertError) {
+            if (insertError.code !== "23505") {
+              console.error("Error inserting new user:", insertError);
+            }
+            return;
+          }
 
-         setUserRole(role); // Set the role after insertion
-       }
-     } catch (error) {
-       console.error("Unexpected error handling user role:", error);
-     }
-   };
+          setUserRole(role);
+        }
+      } catch (error) {
+        console.error("Unexpected error handling user role:", error);
+      }
+    };
 
-   initializeUser();
+    initializeUser();
 
-   const { data: authListener } = supabase.auth.onAuthStateChange(
-     async (event, session) => {
-       const currentUser = session?.user ?? null;
-       if (currentUser) {
-         setUser(currentUser);
-         await checkAndHandleUserRole(currentUser); // Avoid duplicate logic
-       } else {
-         setUser(null);
-         setUserRole(null);
-       }
-     }
-   );
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        const currentUser = session?.user ?? null;
+        if (currentUser) {
+          setUser(currentUser);
+          await checkAndHandleUserRole(currentUser);
+        } else {
+          setUser(null);
+          setUserRole(null);
+        }
+      }
+    );
 
-   return () => {
-     authListener.subscription.unsubscribe();
-   };
- }, [supabase, setUserRole]);
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase, setUserRole]);
 
+  const handleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  };
 
- const handleSignIn = async () => {
-   await supabase.auth.signInWithOAuth({
-     provider: "google",
-     options: {
-       redirectTo: `${window.location.origin}/auth/callback`,
-     },
-   });
- };
-
- const handleSignOut = async () => {
-   await supabase.auth.signOut();
-   router.refresh();
- };
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.refresh();
+  };
 
 
   const handleExportCalendar = async () => {
@@ -242,7 +237,13 @@ END:VCALENDAR`;
         <Calendar className="h-6 w-6" />
         <h1 className="text-2xl font-bold">PropTech Events Calendar</h1>
       </div>
-      <div className="flex items-center space-x-2">
+       <div className="flex items-center space-x-2">
+        {user && userRole === "admin" && (
+          <Button onClick={() => router.push("/admin")} variant="secondary">
+            <Settings className="mr-2 h-4 w-4" />
+            Admin Panel
+          </Button>
+        )}
         {user && (
           <>
             <Button onClick={handleExportCalendar} variant="secondary">
