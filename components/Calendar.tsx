@@ -43,76 +43,6 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
-  // const fetchUserRole = async () => {
-  //   if (user?.id) {
-  //     const { data, error } = await supabase
-  //       .from("users")
-  //       .select("role")
-  //       .eq("id", user.id)
-  //       .single();
-
-  //     if (error) {
-  //       console.error("Error fetching user role:", error);
-  //       return;
-  //     }
-
-  //     setUserRole(data?.role || null);
-  //   }
-  // };
-
-  const memoizedFetchEvents = React.useCallback(() => {
-    const fetchEvents = async () => {
-      const startOfMonthDate = startOfMonth(currentDate).toISOString();
-      const endOfMonthDate = endOfMonth(currentDate).toISOString();
-
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .lte("startdate", endOfMonthDate)
-        .gte("enddate", startOfMonthDate);
-
-      if (error) {
-        console.error("Error fetching events:", error);
-        return;
-      }
-
-      setEvents((data as Event[]) || []);
-    };
-
-    fetchEvents();
-  }, [currentDate, supabase]);
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (user?.id) {
-        const { data, error } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user role:", error);
-          return;
-        }
-
-        setUserRole(data?.role || null);
-      }
-    };
-
-    fetchUserRole();
-    memoizedFetchEvents();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [memoizedFetchEvents, supabase, user?.id]);
- // Add fetchUserRole
-
   const fetchEvents = async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
     const endOfMonthDate = endOfMonth(currentDate).toISOString();
@@ -130,6 +60,40 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
     setEvents((data as Event[]) || []);
   };
+
+  useEffect(() => {
+    const fetchUserRoleAndEvents = async () => {
+      if (user?.id) {
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user role:", userError);
+        } else {
+          setUserRole(userData?.role || null);
+        }
+      }
+
+      await fetchEvents();
+    };
+
+    fetchUserRoleAndEvents();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, user?.id]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [currentDate]);
 
   const handlePrevMonth = () => {
     setCurrentDate((prevDate) => subMonths(prevDate, 1));

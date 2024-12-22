@@ -11,5 +11,6 @@ export interface Event {
     path: string | null;
     filename: string | null;
     publicUrl?: string;
+    
   };
 }

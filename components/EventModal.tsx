@@ -52,10 +52,50 @@ const EventModal: React.FC<EventModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const supabase = createClientComponentClient();
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    setEditedEvent(event);
-  }, [event]);
+    if (event) {
+      setEditedEvent(event);
+
+      console.log("Event data:", event);
+
+      // Parse the attachment JSON if it's a string
+      let parsedAttachment;
+      try {
+        parsedAttachment =
+          typeof event.attachment === "string"
+            ? JSON.parse(event.attachment)
+            : event.attachment;
+      } catch (parseError) {
+        console.error("Error parsing attachment JSON:", parseError);
+        parsedAttachment = null;
+      }
+
+      // Generate public URL for the attachment if a valid path exists
+      if (parsedAttachment?.path) {
+        const { data } = supabase.storage
+          .from("event-attachments")
+          .getPublicUrl(parsedAttachment.path);
+
+        if (error) {
+          console.error("Error fetching public URL:", error);
+          setAttachmentUrl(null);
+        } else {
+          console.log("Public URL data:", data);
+          setAttachmentUrl(data?.publicUrl || null);
+        }
+      } else {
+        console.log("No valid attachment path found");
+        setAttachmentUrl(null);
+      }
+
+      // Update the event with the parsed attachment
+      setEditedEvent((prev) => ({ ...prev, attachment: parsedAttachment }));
+    }
+  }, [event, supabase]);
+
+
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -96,9 +136,14 @@ const EventModal: React.FC<EventModalProps> = ({
           throw new Error(`File upload failed: ${uploadError.message}`);
         }
 
+        const { data: publicUrlData } = supabase.storage
+          .from("event-attachments")
+          .getPublicUrl(data.path);
+
         updatedEvent.attachment = {
-          path: data?.path || "",
+          path: data.path,
           filename: file.name,
+          publicUrl: publicUrlData.publicUrl, // Ensure this is added
         };
       }
 
@@ -256,12 +301,12 @@ const EventModal: React.FC<EventModalProps> = ({
                 <div className="col-span-3 flex items-center gap-2 bg-muted p-2 rounded-md">
                   <File size={16} />
                   <a
-                    href={editedEvent.attachment.publicUrl}
+                    href={attachmentUrl || undefined} // Ensure href gets a valid value
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-blue-500 hover:underline truncate"
                   >
-                    {editedEvent.attachment.filename || "View Attachment"}
+                    {editedEvent.attachment?.filename || "View Attachment"}
                   </a>
                 </div>
               </div>
