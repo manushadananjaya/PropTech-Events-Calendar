@@ -78,13 +78,7 @@ const EventModal: React.FC<EventModalProps> = ({
           .from("event-attachments")
           .getPublicUrl(parsedAttachment.path);
 
-        if (error) {
-          console.error("Error fetching public URL:", error);
-          setAttachmentUrl(null);
-        } else {
-      
-          setAttachmentUrl(data?.publicUrl || null);
-        }
+        setAttachmentUrl(data?.publicUrl || null);
       } else {
         console.log("No valid attachment path found");
         setAttachmentUrl(null);
@@ -94,7 +88,6 @@ const EventModal: React.FC<EventModalProps> = ({
       setEditedEvent((prev) => ({ ...prev, attachment: parsedAttachment }));
     }
   }, [event, supabase]);
-
 
 
   const handleChange = (

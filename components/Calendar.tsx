@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -44,8 +44,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const userRole = useUserStore((state) => state.userRole);
   const supabase = createClientComponentClient();
 
-
-  const fetchEvents = async () => {
+  // Memoized fetchEvents function
+  const fetchEvents = useCallback(async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
     const endOfMonthDate = endOfMonth(currentDate).toISOString();
 
@@ -61,8 +61,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
     }
 
     setEvents((data as Event[]) || []);
-  };
-  
+  }, [currentDate, supabase]);
 
   useEffect(() => {
     const {
@@ -76,7 +75,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
   useEffect(() => {
     fetchEvents();
-  }, [currentDate]);
+  }, [fetchEvents]);
 
   const handlePrevMonth = () => {
     setCurrentDate((prevDate) => subMonths(prevDate, 1));
