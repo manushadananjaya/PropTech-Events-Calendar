@@ -9,20 +9,26 @@ import {
   eachDayOfInterval,
   format,
   isSameMonth,
-  isSameDay,
   isWithinInterval,
   parseISO,
   addMonths,
   subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Paperclip, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import EventModal from "./EventModal";
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Session } from "@supabase/supabase-js";
+import { Session, User } from "@supabase/supabase-js";
 import { v4 as uuidv4 } from "uuid";
+
+const ACCESS_LEVELS = {
+  ADMIN: "admin",
+  EDIT: "edit",
+  READONLY: "readonly",
+  USER: "user",
+};
 
 interface CalendarProps {
   initialSession: Session | null;
@@ -33,18 +39,39 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [session, setSession] = useState<Session | null>(initialSession);
+  const [user, setUser] = useState<User | null>(initialSession?.user ?? null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
+    const fetchUserRole = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching user role:", error);
+          return;
+        }
+
+        setUserRole(data?.role || null);
+      }
+    };
+
+    fetchUserRole();
     fetchEvents();
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      setUser(session?.user ?? null);
     });
+
     return () => subscription.unsubscribe();
-  }, [currentDate]);
+  }, [currentDate, user]);
 
   const fetchEvents = async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
@@ -73,40 +100,47 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   };
 
   const handleDateClick = (date: Date) => {
-    if (session) {
-      setSelectedEvent({
-        id: null,
-        name: "",
-        startdate: date.toISOString(),
-        enddate: date.toISOString(),
-        cost: "",
-        location: "",
-        attachment: undefined,
-      });
-      setIsModalOpen(true);
+    if (!user) {
+      alert("You must be logged in to add events.");
+      return;
     }
+
+    setSelectedEvent({
+      id: null,
+      name: "",
+      startdate: date.toISOString(),
+      enddate: date.toISOString(),
+      cost: "",
+      location: "",
+      createdBy: user.id,
+      accessLevel: ACCESS_LEVELS.EDIT as "admin" | "edit" | "readonly",
+      attachment: undefined,
+    });
+    setIsModalOpen(true);
   };
 
   const handleEventClick = async (event: Event) => {
-    let updatedEvent = { ...event };
-    if (event.attachment?.path) {
-      const { data } = supabase.storage
-        .from("event-attachments")
-        .getPublicUrl(event.attachment.path);
+    if (canViewEvent(event)) {
+      let updatedEvent = { ...event };
+      if (event.attachment?.path) {
+        const { data } = supabase.storage
+          .from("event-attachments")
+          .getPublicUrl(event.attachment.path);
 
-      if (data) {
-        updatedEvent = {
-          ...updatedEvent,
-          attachment: {
-            path: event.attachment.path,
-            filename: event.attachment.filename,
-            publicUrl: data.publicUrl,
-          },
-        };
+        if (data) {
+          updatedEvent = {
+            ...updatedEvent,
+            attachment: {
+              path: event.attachment.path,
+              filename: event.attachment.filename,
+              publicUrl: data.publicUrl,
+            },
+          };
+        }
       }
+      setSelectedEvent(updatedEvent);
+      setIsModalOpen(true);
     }
-    setSelectedEvent(updatedEvent);
-    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -119,7 +153,6 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
       const { id, ...eventData } = event;
 
       if (id) {
-        console.log("Updating event with ID:", id);
         const { error } = await supabase
           .from("events")
           .update(eventData)
@@ -130,9 +163,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
         const newEvent = {
           id: uuidv4(),
           ...eventData,
+          createdBy: user?.id,
         };
-
-        console.log("Creating a new event:", newEvent);
 
         const { error } = await supabase.from("events").insert(newEvent);
 
@@ -141,15 +173,62 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
       await fetchEvents();
       handleCloseModal();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error("Error saving event:", {
-          message: error.message,
-          stack: error.stack,
-        });
-      } else {
-        console.error("Unknown error occurred:", error);
-      }
+    } catch (error) {
+      console.error("Error saving event:", error);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!canDeleteEvents()) return;
+
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventId);
+
+      if (error) throw error;
+
+      await fetchEvents();
+      handleCloseModal();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+    }
+  };
+
+  const canEditEvent = (event: Event) => {
+    if (!user || !userRole) return false;
+    return (
+      userRole === ACCESS_LEVELS.ADMIN ||
+      (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) || userRole === ACCESS_LEVELS.USER
+    );
+  };
+
+  const canViewEvent = (event: Event) => {
+    if (!user || !userRole) return event.accessLevel === ACCESS_LEVELS.READONLY || event.accessLevel === ACCESS_LEVELS.EDIT || event.accessLevel === ACCESS_LEVELS.ADMIN;
+    return (
+      userRole === ACCESS_LEVELS.ADMIN ||
+      userRole === ACCESS_LEVELS.EDIT ||
+      userRole === ACCESS_LEVELS.READONLY || 
+      event.accessLevel === ACCESS_LEVELS.READONLY ||
+      event.accessLevel === ACCESS_LEVELS.EDIT
+    );
+  };
+
+  const canDeleteEvents = () => {
+    return userRole === ACCESS_LEVELS.ADMIN;
+  };
+
+  const getEventColor = (event: Event) => {
+    switch (event.accessLevel) {
+      case ACCESS_LEVELS.ADMIN:
+        return "bg-red-500";
+      case ACCESS_LEVELS.EDIT:
+        return "bg-green-500";
+      case ACCESS_LEVELS.READONLY:
+        return "bg-blue-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
@@ -183,12 +262,8 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
           {days.map((day) => (
             <div
               key={day.toString()}
-              className={`p-2 border rounded-md transition-colors ${
-                isSameMonth(day, currentDate)
-                  ? "bg-background hover:bg-accent"
-                  : "bg-muted text-muted-foreground"
-              } ${
-                isSameDay(day, new Date()) ? "border-primary" : "border-border"
+              className={`p-2 border rounded-md ${
+                isSameMonth(day, currentDate) ? "bg-background" : "bg-muted"
               }`}
               onClick={() => handleDateClick(day)}
             >
@@ -204,7 +279,9 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
                   .map((event) => (
                     <div
                       key={event.id}
-                      className="text-xs p-1 rounded-sm cursor-pointer bg-primary/70 text-primary-foreground flex items-center gap-1 truncate"
+                      className={`text-xs p-1 rounded-sm cursor-pointer ${getEventColor(
+                        event
+                      )} text-white flex items-center gap-1 truncate`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleEventClick(event);
@@ -218,7 +295,7 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
             </div>
           ))}
         </div>
-        {session && (
+        {user && (
           <Button className="mt-4" onClick={() => handleDateClick(new Date())}>
             <Plus className="mr-2 h-4 w-4" /> Add Event
           </Button>
@@ -228,8 +305,12 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
         <EventModal
           event={selectedEvent}
           onClose={handleCloseModal}
-          onSave={handleSaveEvent}
-          canEdit={!!session}
+          onSave={
+            canEditEvent(selectedEvent) ? handleSaveEvent : async () => {}
+          } // Use a no-op function
+          onDelete={canDeleteEvents() ? handleDeleteEvent : undefined}
+          canEdit={canEditEvent(selectedEvent)}
+          isAdmin={userRole === ACCESS_LEVELS.ADMIN}
         />
       )}
     </Card>
