@@ -63,16 +63,35 @@ const CalendarHeader: React.FC = () => {
     try {
       const icalEvents = events
         .map((event) => {
+          const startDate = event.startdate
+            ? new Date(event.startdate)
+                .toISOString()
+                .replace(/[-:]/g, "")
+                .split(".")[0] + "Z"
+            : null;
+          const endDate = event.enddate
+            ? new Date(event.enddate)
+                .toISOString()
+                .replace(/[-:]/g, "")
+                .split(".")[0] + "Z"
+            : null;
+
+          if (!startDate || !endDate) {
+            return null; // Skip events without valid dates
+          }
+
           return `BEGIN:VEVENT
-SUMMARY:${event.name}
-DTSTART:${new Date(event.startdate).toISOString()}
-DTEND:${new Date(event.enddate).toISOString()}
+SUMMARY:${event.name || "Untitled Event"}
+DTSTART:${startDate}
+DTEND:${endDate}
 DESCRIPTION:${event.cost ? `Cost: ${event.cost}\n` : ""}${
             event.location ? `Location: ${event.location}` : ""
           }
 UID:${event.id}
+LOCATION:${event.location || ""}
 END:VEVENT`;
         })
+        .filter(Boolean) // Remove null entries
         .join("\n");
 
       const icalContent = `BEGIN:VCALENDAR
@@ -98,6 +117,7 @@ END:VCALENDAR`;
       toast.error("Failed to export calendar. Please try again.");
     }
   };
+
 
   return (
     <header className="flex justify-between items-center p-4 bg-primary text-primary-foreground">
