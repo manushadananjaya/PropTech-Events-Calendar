@@ -38,7 +38,7 @@ const CalendarHeader: React.FC = () => {
   const { userRole, setUserRole } = useUserStore();
 
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
 
   useEffect(() => {
     const initializeUser = async () => {
