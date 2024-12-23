@@ -24,29 +24,77 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({
   const supabase = createClientComponentClient();
 
   useEffect(() => {
-    const fetchSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+    const fetchSessionAndRole = async () => {
+      try {
+        // Get the current session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        setUserRole(userData?.role ?? null);
+        if (session?.user) {
+          const userId = session.user.id;
+
+          // Check if the user already exists in the database
+          const { data: existingUser, error: fetchError } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", userId)
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error("Error fetching user data:", fetchError.message);
+            return;
+          }
+
+          if (existingUser) {
+            // If the user exists, set their role
+            setUserRole(existingUser.role);
+          } else {
+            // Check if this is the first user
+            const { count: userCount, error: countError } = await supabase
+              .from("users")
+              .select("id", { count: "exact" });
+
+            if (countError) {
+              console.error("Error checking user count:", countError.message);
+              return;
+            }
+
+            // Use upsert to insert the first user as admin or others as user
+            const role = userCount === 0 ? "admin" : "user";
+            const { error: upsertError } = await supabase.from("users").upsert(
+              {
+                id: userId,
+                email: session.user.email,
+                role,
+              },
+              { onConflict: "id" } // Prevent duplicate inserts
+            );
+
+            if (upsertError) {
+              console.error(
+                "Error upserting user into database:",
+                upsertError.message
+              );
+            } else {
+              setUserRole(role);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Unexpected error in session logic:", err);
       }
     };
 
-    fetchSession();
+    fetchSessionAndRole();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        if (newSession?.user) fetchSessionAndRole();
       }
     );
 
