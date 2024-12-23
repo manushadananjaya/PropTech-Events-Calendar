@@ -18,6 +18,9 @@ import { User } from "@supabase/supabase-js";
 import { Calendar, LogOut, Download, Upload, Settings } from "lucide-react";
 import { Event } from "@/types/event";
 import { create } from "zustand";
+// import { toast } from "react-toastify"; 
+
+
 
 // Create a global store for user role
 // Zustand store to manage user role
@@ -48,11 +51,11 @@ const CalendarHeader: React.FC = () => {
 
       if (user) {
         setUser(user);
-        await checkAndHandleUserRole(user);
+        await updateUserRole(user);
       }
     };
 
-    const checkAndHandleUserRole = async (user: User) => {
+    const updateUserRole = async (user: User) => {
       try {
         const { data: existingUser, error } = await supabase
           .from("users")
@@ -62,6 +65,7 @@ const CalendarHeader: React.FC = () => {
 
         if (error && error.code !== "PGRST116") {
           console.error("Error fetching user role:", error);
+          // toast.error("Failed to fetch user role.");
           return;
         }
 
@@ -81,16 +85,16 @@ const CalendarHeader: React.FC = () => {
           });
 
           if (insertError) {
-            if (insertError.code !== "23505") {
-              console.error("Error inserting new user:", insertError);
-            }
+            console.error("Error inserting new user:", insertError);
+            // toast.error("Failed to create new user.");
             return;
           }
 
           setUserRole(role);
         }
-      } catch (error) {
-        console.error("Unexpected error handling user role:", error);
+      } catch (err) {
+        console.error("Unexpected error handling user role:", err);
+        // toast.error("An unexpected error occurred.");
       }
     };
 
@@ -98,13 +102,14 @@ const CalendarHeader: React.FC = () => {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        const currentUser = session?.user ?? null;
-        if (currentUser) {
-          setUser(currentUser);
-          await checkAndHandleUserRole(currentUser);
+        if (session?.user) {
+          setUser(session.user);
+          await updateUserRole(session.user);
+          router.refresh();
         } else {
           setUser(null);
           setUserRole(null);
+          router.refresh();
         }
       }
     );
@@ -112,7 +117,7 @@ const CalendarHeader: React.FC = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [supabase, setUserRole]);
+  }, [supabase, setUserRole, router]);
 
   const handleSignIn = async () => {
     await supabase.auth.signInWithOAuth({
