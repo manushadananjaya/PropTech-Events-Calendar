@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
+import { toast } from "react-hot-toast";
 
 interface User {
   id: string;
@@ -46,12 +47,14 @@ const AdminPanel: React.FC = () => {
       if (error) {
         setError("Error fetching users. Please try again.");
         console.error("Error fetching users:", error.message);
+        toast.error("Failed to fetch events.");
       } else {
         setUsers(data || []);
       }
     } catch (err) {
       setError("Unexpected error fetching users. Please try again.");
       console.error("Unexpected error fetching users:", err);
+      toast.error("Failed to fetch events.");
     } finally {
       setIsLoading(false);
     }
@@ -71,12 +74,14 @@ const AdminPanel: React.FC = () => {
       if (error) {
         alert("Error updating user role. Please try again.");
         console.error("Error updating user role:", error.message);
+        toast.error("Failed to update user role.");
       } else {
-        console.log("User role updated successfully.");
+        toast.success("User role updated successfully.");
         fetchUsers();
       }
     } catch (err) {
       alert("Unexpected error updating user role. Please try again.");
+      toast.error("Unexpected error updating user role. Please try again.");
       console.error("Unexpected error updating user role:", err);
     }
   };

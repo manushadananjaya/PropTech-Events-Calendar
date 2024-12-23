@@ -3,6 +3,7 @@ import { Geist, Azeret_Mono as Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { colors } from "@/lib/theme";
 import { SessionProvider } from "@/context/SessionContext";
+import { Toaster } from "react-hot-toast";
 
 
 const geistSans = Geist({
@@ -49,6 +50,7 @@ export default function RootLayout({
       >
         {" "}
         <SessionProvider>{children}</SessionProvider>
+        <Toaster />
       </body>
     </html>
   );

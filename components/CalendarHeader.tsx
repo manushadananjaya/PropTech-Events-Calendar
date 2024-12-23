@@ -1,9 +1,9 @@
-// CalendarHeader.tsx
 "use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import toast from "react-hot-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,12 +18,7 @@ import { useSessionContext } from "@/context/SessionContext";
 import { Calendar, LogOut, Download, Upload, Settings } from "lucide-react";
 import { Event } from "@/types/event";
 import { create } from "zustand";
-// import { toast } from "react-toastify"; 
 
-
-
-// Create a global store for user role
-// Zustand store to manage user role
 interface UserStore {
   userRole: string | null;
   setUserRole: (role: string | null) => void;
@@ -40,52 +35,69 @@ const CalendarHeader: React.FC = () => {
   const supabase = createClientComponentClient();
 
   const handleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({ provider: "google" });
+    try {
+      await supabase.auth.signInWithOAuth({ provider: "google" });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to sign in. Please try again.");
+    }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+      router.refresh();
+      toast.success("Signed out successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to sign out. Please try again.");
+    }
   };
 
   const handleExportCalendar = async () => {
     const { data: events, error } = await supabase.from("events").select("*");
     if (error) {
-      console.error("Error fetching events:", error);
+      toast.error("Failed to fetch events. Please try again.");
       return;
     }
 
-    // Convert events to iCal format
-    const icalEvents = events
-      .map((event) => {
-        return `BEGIN:VEVENT
+    try {
+      const icalEvents = events
+        .map((event) => {
+          return `BEGIN:VEVENT
 SUMMARY:${event.name}
 DTSTART:${new Date(event.startdate).toISOString()}
 DTEND:${new Date(event.enddate).toISOString()}
 DESCRIPTION:${event.cost ? `Cost: ${event.cost}\n` : ""}${
-          event.location ? `Location: ${event.location}` : ""
-        }
+            event.location ? `Location: ${event.location}` : ""
+          }
 UID:${event.id}
 END:VEVENT`;
-      })
-      .join("\n");
+        })
+        .join("\n");
 
-    const icalContent = `BEGIN:VCALENDAR
+      const icalContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//PropTech Events Calendar//EN
 ${icalEvents}
 END:VCALENDAR`;
 
-    const blob = new Blob([icalContent], {
-      type: "text/calendar;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "proptech_events.ics");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const blob = new Blob([icalContent], {
+        type: "text/calendar;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "proptech_events.ics");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("Calendar exported successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export calendar. Please try again.");
+    }
   };
 
   const handleImportCalendar = async () => {
@@ -98,54 +110,57 @@ END:VCALENDAR`;
 
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const content = e.target?.result as string;
-        let events: Partial<Event>[] = [];
+        try {
+          const content = e.target?.result as string;
+          let events: Partial<Event>[] = [];
 
-        if (file.name.endsWith(".ics")) {
-          const icalEvents = content.split("BEGIN:VEVENT").slice(1);
-          events = icalEvents.map((eventStr) => {
-            const lines = eventStr.split("\n");
-            const event: Partial<Event> = {};
-            lines.forEach((line) => {
-              if (line.startsWith("SUMMARY:")) event.name = line.slice(8);
-              if (line.startsWith("DTSTART:"))
-                event.startdate = new Date(line.slice(8)).toISOString();
-              if (line.startsWith("DTEND:"))
-                event.enddate = new Date(line.slice(6)).toISOString();
-              if (line.startsWith("DESCRIPTION:")) {
-                const desc = line.slice(12);
-                const costMatch = desc.match(/Cost: (.*)/);
-                if (costMatch) event.cost = costMatch[1];
-                const locationMatch = desc.match(/Location: (.*)/);
-                if (locationMatch) event.location = locationMatch[1];
-              }
+          if (file.name.endsWith(".ics")) {
+            const icalEvents = content.split("BEGIN:VEVENT").slice(1);
+            events = icalEvents.map((eventStr) => {
+              const lines = eventStr.split("\n");
+              const event: Partial<Event> = {};
+              lines.forEach((line) => {
+                if (line.startsWith("SUMMARY:")) event.name = line.slice(8);
+                if (line.startsWith("DTSTART:"))
+                  event.startdate = new Date(line.slice(8)).toISOString();
+                if (line.startsWith("DTEND:"))
+                  event.enddate = new Date(line.slice(6)).toISOString();
+                if (line.startsWith("DESCRIPTION:")) {
+                  const desc = line.slice(12);
+                  const costMatch = desc.match(/Cost: (.*)/);
+                  if (costMatch) event.cost = costMatch[1];
+                  const locationMatch = desc.match(/Location: (.*)/);
+                  if (locationMatch) event.location = locationMatch[1];
+                }
+              });
+              return event;
             });
-            return event;
-          });
-        } else if (file.name.endsWith(".csv")) {
-          const rows = content.split("\n").map((row) => row.split(","));
-          const headers = rows[0];
-          events = rows.slice(1).map((row) => {
-            const event: Partial<Event> = {};
-            headers.forEach((header, index) => {
-              if (header === "name") event.name = row[index];
-              if (header === "startdate")
-                event.startdate = new Date(row[index]).toISOString();
-              if (header === "enddate")
-                event.enddate = new Date(row[index]).toISOString();
-              if (header === "cost") event.cost = row[index];
-              if (header === "location") event.location = row[index];
+          } else if (file.name.endsWith(".csv")) {
+            const rows = content.split("\n").map((row) => row.split(","));
+            const headers = rows[0];
+            events = rows.slice(1).map((row) => {
+              const event: Partial<Event> = {};
+              headers.forEach((header, index) => {
+                if (header === "name") event.name = row[index];
+                if (header === "startdate")
+                  event.startdate = new Date(row[index]).toISOString();
+                if (header === "enddate")
+                  event.enddate = new Date(row[index]).toISOString();
+                if (header === "cost") event.cost = row[index];
+                if (header === "location") event.location = row[index];
+              });
+              return event;
             });
-            return event;
-          });
-        }
+          }
 
-        const { error } = await supabase.from("events").insert(events);
-        if (error) {
-          console.error("Error importing events:", error);
-        } else {
-          console.log("Events imported successfully");
+          const { error } = await supabase.from("events").insert(events);
+          if (error) throw error;
+
+          toast.success("Events imported successfully");
           router.refresh();
+        } catch (err) {
+          console.error("sdsdsd ",err);
+          toast.error("Failed to import events.Make sure to add correct csv file and try again.");
         }
       };
       reader.readAsText(file);
@@ -159,7 +174,7 @@ END:VCALENDAR`;
         <Calendar className="h-6 w-6" />
         <h1 className="text-2xl font-bold">PropTech Events Calendar</h1>
       </div>
-       <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2">
         {user && userRole === "admin" && (
           <Button onClick={() => router.push("/admin")} variant="secondary">
             <Settings className="mr-2 h-4 w-4" />

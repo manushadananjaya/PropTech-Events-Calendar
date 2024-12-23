@@ -33,6 +33,7 @@ import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useSessionContext } from "@/context/SessionContext";
 import { v4 as uuidv4 } from "uuid";
+import toast from "react-hot-toast";
 
 const ACCESS_LEVELS = {
   EDIT: "edit",
@@ -61,16 +62,19 @@ const Calendar: React.FC = () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
     const endOfMonthDate = endOfMonth(currentDate).toISOString();
 
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .lte("startdate", endOfMonthDate)
-      .gte("enddate", startOfMonthDate);
+    try {
+      const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .lte("startdate", endOfMonthDate)
+        .gte("enddate", startOfMonthDate);
 
-    if (error) {
-      console.error("Error fetching events:", error);
-    } else {
+      if (error) throw error;
       setEvents(data as Event[]);
+      
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      toast.error("Failed to fetch events.");
     }
   }, [currentDate, supabase]);
 
@@ -91,7 +95,7 @@ const Calendar: React.FC = () => {
 
   const handleDateClick = (date: Date) => {
     if (!user) {
-      alert("You must be logged in to add events.");
+      toast.error("You must be logged in to add events.");
       return;
     }
 
@@ -131,6 +135,7 @@ const Calendar: React.FC = () => {
           .update(eventData)
           .eq("id", id);
         if (error) throw error;
+        toast.success("Event updated successfully!");
       } else {
         const newEvent = {
           id: uuidv4(),
@@ -140,12 +145,14 @@ const Calendar: React.FC = () => {
 
         const { error } = await supabase.from("events").insert(newEvent);
         if (error) throw error;
+        toast.success("Event added successfully!");
       }
 
       await fetchEvents();
       handleCloseModal();
     } catch (error) {
       console.error("Error saving event:", error);
+      toast.error("Failed to save event.");
     }
   };
 
@@ -159,10 +166,12 @@ const Calendar: React.FC = () => {
         .eq("id", eventId);
       if (error) throw error;
 
+      toast.success("Event deleted successfully!");
       await fetchEvents();
       handleCloseModal();
     } catch (error) {
       console.error("Error deleting event:", error);
+      toast.error("Failed to delete event.");
     }
   };
 
