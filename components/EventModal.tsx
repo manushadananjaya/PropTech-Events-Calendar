@@ -24,7 +24,6 @@ import { File, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ACCESS_LEVELS = {
-  ADMIN: "admin",
   EDIT: "edit",
   READONLY: "readonly",
 } as const;
@@ -58,9 +57,6 @@ const EventModal: React.FC<EventModalProps> = ({
     if (event) {
       setEditedEvent(event);
 
-      console.log("Event data:", event);
-
-      // Parse the attachment JSON if it's a string
       let parsedAttachment;
       try {
         parsedAttachment =
@@ -72,7 +68,6 @@ const EventModal: React.FC<EventModalProps> = ({
         parsedAttachment = null;
       }
 
-      // Generate public URL for the attachment if a valid path exists
       if (parsedAttachment?.path) {
         const { data } = supabase.storage
           .from("event-attachments")
@@ -84,11 +79,9 @@ const EventModal: React.FC<EventModalProps> = ({
         setAttachmentUrl(null);
       }
 
-      // Update the event with the parsed attachment
       setEditedEvent((prev) => ({ ...prev, attachment: parsedAttachment }));
     }
   }, [event, supabase]);
-
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -102,7 +95,6 @@ const EventModal: React.FC<EventModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      // Check file size (5MB limit)
       if (selectedFile.size > 5 * 1024 * 1024) {
         setError("File size must be less than 5MB");
         return;
@@ -136,7 +128,7 @@ const EventModal: React.FC<EventModalProps> = ({
         updatedEvent.attachment = {
           path: data.path,
           filename: file.name,
-          publicUrl: publicUrlData.publicUrl, // Ensure this is added
+          publicUrl: publicUrlData.publicUrl,
         };
       }
 
@@ -180,153 +172,127 @@ const EventModal: React.FC<EventModalProps> = ({
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                name="name"
-                value={editedEvent.name}
-                onChange={handleChange}
-                className="col-span-3"
-                required
-                disabled={!canEdit || isLoading}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="startDate" className="text-right">
-                Start
-              </Label>
-              <Input
-                id="startDate"
-                name="startdate"
-                type="datetime-local"
-                value={new Date(editedEvent.startdate)
-                  .toISOString()
-                  .slice(0, 16)}
-                onChange={handleChange}
-                className="col-span-3"  
-                required
-                disabled={!canEdit || isLoading}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="endDate" className="text-right">
-                End
-              </Label>
-              <Input
-                id="endDate"
-                name="enddate"
-                type="datetime-local"
-                value={new Date(editedEvent.enddate).toISOString().slice(0, 16)}
-                onChange={handleChange}
-                className="col-span-3"
-                required
-                disabled={!canEdit || isLoading}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cost" className="text-right">
-                Cost
-              </Label>
-              <Input
-                id="cost"
-                name="cost"
-                value={editedEvent.cost}
-                onChange={handleChange}
-                className="col-span-3"
-                disabled={!canEdit || isLoading}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">
-                Location
-              </Label>
-              <Input
-                id="location"
-                name="location"
-                value={editedEvent.location}
-                onChange={handleChange}
-                className="col-span-3"
-                disabled={!canEdit || isLoading}
-              />
-            </div>
-
-            {isAdmin && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="accessLevel" className="text-right">
-                  Access Level
-                </Label>
-                <Select
-                  name="accessLevel"
-                  value={editedEvent.accessLevel}
-                  onValueChange={(value) =>
-                    handleChange({
-                      target: { name: "accessLevel", value },
-                    } as React.ChangeEvent<HTMLSelectElement>)
-                  }
-                  disabled={isLoading}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select access level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ACCESS_LEVELS.ADMIN}>Admin</SelectItem>
-                    <SelectItem value={ACCESS_LEVELS.EDIT}>Edit</SelectItem>
-                    <SelectItem value={ACCESS_LEVELS.READONLY}>
-                      Read Only
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {editedEvent.attachment && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Attachment</Label>
-                <div className="col-span-3 flex items-center gap-2 bg-muted p-2 rounded-md">
-                  <File size={16} />
-                  <a
-                    href={attachmentUrl || undefined} // Ensure href gets a valid value
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-500 hover:underline truncate"
-                  >
-                    {editedEvent.attachment?.filename || "View Attachment"}
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {canEdit && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="file" className="text-right">
-                  New Attachment
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="file"
-                    name="file"
-                    type="file"
-                    onChange={handleFileChange}
-                    disabled={isLoading}
-                  />
-                  {file && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      New file: {file.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={editedEvent.name}
+              onChange={handleChange}
+              required
+              disabled={!canEdit || isLoading}
+            />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="startDate">Start</Label>
+            <Input
+              id="startDate"
+              name="startdate"
+              type="datetime-local"
+              value={new Date(editedEvent.startdate).toISOString().slice(0, 16)}
+              onChange={handleChange}
+              required
+              disabled={!canEdit || isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="endDate">End</Label>
+            <Input
+              id="endDate"
+              name="enddate"
+              type="datetime-local"
+              value={new Date(editedEvent.enddate).toISOString().slice(0, 16)}
+              onChange={handleChange}
+              required
+              disabled={!canEdit || isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cost">Cost</Label>
+            <Input
+              id="cost"
+              name="cost"
+              value={editedEvent.cost}
+              onChange={handleChange}
+              disabled={!canEdit || isLoading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              name="location"
+              value={editedEvent.location}
+              onChange={handleChange}
+              disabled={!canEdit || isLoading}
+            />
+          </div>
+
+          {isAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="accessLevel">Access Level</Label>
+              <Select
+                name="accessLevel"
+                value={editedEvent.accessLevel}
+                onValueChange={(value) =>
+                  handleChange({
+                    target: { name: "accessLevel", value },
+                  } as React.ChangeEvent<HTMLSelectElement>)
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select access level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ACCESS_LEVELS.EDIT}>Edit</SelectItem>
+                  <SelectItem value={ACCESS_LEVELS.READONLY}>
+                    Read Only
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {editedEvent.attachment && (
+            <div className="space-y-2">
+              <Label>Attachment</Label>
+              <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
+                <File size={16} />
+                <a
+                  href={attachmentUrl || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-500 hover:underline truncate"
+                >
+                  {editedEvent.attachment?.filename || "View Attachment"}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {canEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="file">New Attachment</Label>
+              <Input
+                id="file"
+                name="file"
+                type="file"
+                onChange={handleFileChange}
+                disabled={isLoading}
+              />
+              {file && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  New file: {file.name}
+                </p>
+              )}
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
             {canEdit && (
@@ -335,7 +301,7 @@ const EventModal: React.FC<EventModalProps> = ({
                 {event.id ? "Update Event" : "Create Event"}
               </Button>
             )}
-            {isAdmin && event.id && onDelete && (
+            {canEdit && event.id && onDelete && (
               <Button
                 type="button"
                 variant="destructive"
@@ -350,24 +316,6 @@ const EventModal: React.FC<EventModalProps> = ({
             )}
           </DialogFooter>
         </form>
-
-        <div className="mt-4 text-sm">
-          <h4 className="font-semibold mb-2">Access Level Colors:</h4>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 bg-red-500 rounded-full"></span>
-              <span>Admin - Only admins can edit</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 bg-green-500 rounded-full"></span>
-              <span>Edit - Creator and admins can edit</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 bg-blue-500 rounded-full"></span>
-              <span>Read Only - Anyone can view</span>
-            </div>
-          </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

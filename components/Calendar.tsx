@@ -13,11 +13,13 @@ import {
   parseISO,
   addMonths,
   subMonths,
+  isSameDay,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Paperclip } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import EventModal from "./EventModal";
+import EventsList from "./EventsList";
 import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Session, User } from "@supabase/supabase-js";
@@ -25,10 +27,8 @@ import { v4 as uuidv4 } from "uuid";
 import { useUserStore } from "./CalendarHeader";
 
 const ACCESS_LEVELS = {
-  ADMIN: "admin",
   EDIT: "edit",
   READONLY: "readonly",
-  USER: "user",
 };
 
 interface CalendarProps {
@@ -36,7 +36,7 @@ interface CalendarProps {
 }
 
 const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date()); 
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,7 +44,6 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   const userRole = useUserStore((state) => state.userRole);
   const supabase = createClientComponentClient();
 
-  // Memoized fetchEvents function
   const fetchEvents = useCallback(async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
     const endOfMonthDate = endOfMonth(currentDate).toISOString();
@@ -99,32 +98,15 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
       cost: "",
       location: "",
       createdBy: user.id,
-      accessLevel: ACCESS_LEVELS.EDIT as "admin" | "edit" | "readonly",
+      accessLevel: ACCESS_LEVELS.EDIT as "edit" | "readonly",
       attachment: undefined,
     });
     setIsModalOpen(true);
   };
 
-  const handleEventClick = async (event: Event) => {
+  const handleEventClick = (event: Event) => {
     if (canViewEvent(event)) {
-      let updatedEvent = { ...event };
-      if (event.attachment?.path) {
-        const { data } = supabase.storage
-          .from("event-attachments")
-          .getPublicUrl(event.attachment.path);
-
-        if (data) {
-          updatedEvent = {
-            ...updatedEvent,
-            attachment: {
-              path: event.attachment.path,
-              filename: event.attachment.filename,
-              publicUrl: data.publicUrl,
-            },
-          };
-        }
-      }
-      setSelectedEvent(updatedEvent);
+      setSelectedEvent(event);
       setIsModalOpen(true);
     }
   };
@@ -184,51 +166,36 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
 
   const canEditEvent = (event: Event) => {
     if (!user || !userRole) return false;
-
-    // Allow editing admin-level events only for admin users
-    if (event.accessLevel === ACCESS_LEVELS.ADMIN) {
-      return userRole === ACCESS_LEVELS.ADMIN;
-    }
-
-    return (
-      userRole === ACCESS_LEVELS.ADMIN ||
-      (event.createdBy === user.id && userRole === ACCESS_LEVELS.EDIT) ||
-      userRole === ACCESS_LEVELS.USER
-    );
+    if (userRole === "admin") return true;
+    if (
+      userRole === "user" &&
+      event.createdBy === user.id &&
+      event.accessLevel === ACCESS_LEVELS.EDIT
+    )
+      return true;
+    return false;
   };
-
 
   const canViewEvent = (event: Event) => {
     if (!user || !userRole)
       return (
         event.accessLevel === ACCESS_LEVELS.READONLY ||
-        event.accessLevel === ACCESS_LEVELS.EDIT ||
-        event.accessLevel === ACCESS_LEVELS.ADMIN
+        event.accessLevel === ACCESS_LEVELS.EDIT
       );
-    return (
-      userRole === ACCESS_LEVELS.ADMIN ||
-      userRole === ACCESS_LEVELS.EDIT ||
-      userRole === ACCESS_LEVELS.READONLY ||
-      event.accessLevel === ACCESS_LEVELS.READONLY ||
-      event.accessLevel === ACCESS_LEVELS.EDIT ||
-      event.accessLevel === ACCESS_LEVELS.ADMIN
-    );
+    return true;
   };
 
   const canDeleteEvents = () => {
-    return userRole === ACCESS_LEVELS.ADMIN;
+    return userRole === "admin";
   };
 
   const getEventColor = (event: Event) => {
     switch (event.accessLevel) {
-      case ACCESS_LEVELS.ADMIN:
-        return "bg-red-500";
       case ACCESS_LEVELS.EDIT:
         return "bg-green-500";
       case ACCESS_LEVELS.READONLY:
-        return "bg-blue-500";
       default:
-        return "bg-gray-500";
+        return "bg-blue-500";
     }
   };
 
@@ -238,82 +205,119 @@ const Calendar: React.FC<CalendarProps> = ({ initialSession }) => {
   });
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">
-          {format(currentDate, "MMMM yyyy")}
-        </CardTitle>
-        <div className="space-x-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-7 gap-2">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="text-center font-semibold text-sm py-2">
-              {day}
-            </div>
-          ))}
-          {days.map((day) => (
-            <div
-              key={day.toString()}
-              className={`p-2 border rounded-md ${
-                isSameMonth(day, currentDate) ? "bg-background" : "bg-muted"
-              }`}
-              onClick={() => handleDateClick(day)}
-            >
-              <div className="text-right text-sm">{format(day, "d")}</div>
-              <div className="mt-1 space-y-1">
-                {events
-                  .filter((event) =>
+    <div className="w-full max-w-6xl mx-auto space-y-8">
+      <Card className="bg-white/50 backdrop-blur-sm shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-3xl font-bold text-gray-800">
+            {format(currentDate, "MMMM yyyy")}
+          </CardTitle>
+          <div className="space-x-2">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-2">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <div
+                key={day}
+                className="text-center font-semibold text-sm py-2 text-gray-600"
+              >
+                {day}
+              </div>
+            ))}
+            {days.map((day) => (
+              <div
+                key={day.toString()}
+                className={`p-2 border rounded-md ${
+                  isSameMonth(day, currentDate)
+                    ? "bg-white"
+                    : "bg-gray-100 text-gray-400"
+                } ${
+                  isSameDay(day, new Date()) ? "ring-2 ring-blue-500" : ""
+                } hover:bg-gray-50 transition-colors duration-200`}
+                onClick={() => handleDateClick(day)}
+              >
+                <div className="text-right text-sm font-medium">
+                  {format(day, "d")}
+                </div>
+                <div className="mt-1 space-y-1">
+                  {events
+                    .filter((event) =>
+                      isWithinInterval(day, {
+                        start: parseISO(event.startdate),
+                        end: parseISO(event.enddate),
+                      })
+                    )
+                    .slice(0, 2) // Show only first 2 events
+                    .map((event) => (
+                      <div
+                        key={event.id}
+                        className={`text-xs p-1 rounded-sm cursor-pointer ${getEventColor(
+                          event
+                        )} text-white truncate`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEventClick(event);
+                        }}
+                      >
+                        {event.name}
+                      </div>
+                    ))}
+                  {events.filter((event) =>
                     isWithinInterval(day, {
                       start: parseISO(event.startdate),
                       end: parseISO(event.enddate),
                     })
-                  )
-                  .map((event) => (
-                    <div
-                      key={event.id}
-                      className={`text-xs p-1 rounded-sm cursor-pointer ${getEventColor(
-                        event
-                      )} text-white flex items-center gap-1 truncate`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEventClick(event);
-                      }}
-                    >
-                      <span className="truncate">{event.name}</span>
-                      {event.attachment && <Paperclip size={10} />}
+                  ).length > 2 && (
+                    <div className="text-xs text-gray-500">
+                      {events.filter((event) =>
+                        isWithinInterval(day, {
+                          start: parseISO(event.startdate),
+                          end: parseISO(event.enddate),
+                        })
+                      ).length - 2}{" "}
+                      more
                     </div>
-                  ))}
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        {user && (
-          <Button className="mt-4" onClick={() => handleDateClick(new Date())}>
-            <Plus className="mr-2 h-4 w-4" /> Add Event
-          </Button>
-        )}
-      </CardContent>
+            ))}
+          </div>
+          {user && (
+            <Button
+              className="mt-4"
+              onClick={() => handleDateClick(new Date())}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Event
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <EventsList
+        events={events}
+        onEventClick={handleEventClick}
+        getEventColor={getEventColor}
+      />
+
       {isModalOpen && selectedEvent && (
         <EventModal
           event={selectedEvent}
           onClose={handleCloseModal}
           onSave={
             canEditEvent(selectedEvent) ? handleSaveEvent : async () => {}
-          } // Use a no-op function
+          }
           onDelete={canDeleteEvents() ? handleDeleteEvent : undefined}
           canEdit={canEditEvent(selectedEvent)}
-          isAdmin={userRole === ACCESS_LEVELS.ADMIN}
+          isAdmin={userRole === "admin"}
         />
       )}
-    </Card>
+    </div>
   );
 };
 
