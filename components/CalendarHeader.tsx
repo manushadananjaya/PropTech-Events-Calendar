@@ -15,8 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useSessionContext } from "@/context/SessionContext";
-import { Calendar, LogOut, Download, Upload, Settings } from "lucide-react";
-import { Event } from "@/types/event";
+import { Calendar, LogOut, Download, Settings } from "lucide-react";
 import { create } from "zustand";
 
 interface UserStore {
@@ -100,74 +99,6 @@ END:VCALENDAR`;
     }
   };
 
-  const handleImportCalendar = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".ics,.csv";
-    input.onchange = async (e: globalThis.Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = e.target?.result as string;
-          let events: Partial<Event>[] = [];
-
-          if (file.name.endsWith(".ics")) {
-            const icalEvents = content.split("BEGIN:VEVENT").slice(1);
-            events = icalEvents.map((eventStr) => {
-              const lines = eventStr.split("\n");
-              const event: Partial<Event> = {};
-              lines.forEach((line) => {
-                if (line.startsWith("SUMMARY:")) event.name = line.slice(8);
-                if (line.startsWith("DTSTART:"))
-                  event.startdate = new Date(line.slice(8)).toISOString();
-                if (line.startsWith("DTEND:"))
-                  event.enddate = new Date(line.slice(6)).toISOString();
-                if (line.startsWith("DESCRIPTION:")) {
-                  const desc = line.slice(12);
-                  const costMatch = desc.match(/Cost: (.*)/);
-                  if (costMatch) event.cost = costMatch[1];
-                  const locationMatch = desc.match(/Location: (.*)/);
-                  if (locationMatch) event.location = locationMatch[1];
-                }
-              });
-              return event;
-            });
-          } else if (file.name.endsWith(".csv")) {
-            const rows = content.split("\n").map((row) => row.split(","));
-            const headers = rows[0];
-            events = rows.slice(1).map((row) => {
-              const event: Partial<Event> = {};
-              headers.forEach((header, index) => {
-                if (header === "name") event.name = row[index];
-                if (header === "startdate")
-                  event.startdate = new Date(row[index]).toISOString();
-                if (header === "enddate")
-                  event.enddate = new Date(row[index]).toISOString();
-                if (header === "cost") event.cost = row[index];
-                if (header === "location") event.location = row[index];
-              });
-              return event;
-            });
-          }
-
-          const { error } = await supabase.from("events").insert(events);
-          if (error) throw error;
-
-          toast.success("Events imported successfully");
-          router.refresh();
-        } catch (err) {
-          console.error("sdsdsd ",err);
-          toast.error("Failed to import events.Make sure to add correct csv file and try again.");
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
-
   return (
     <header className="flex justify-between items-center p-4 bg-primary text-primary-foreground">
       <div className="flex items-center space-x-2">
@@ -182,16 +113,10 @@ END:VCALENDAR`;
           </Button>
         )}
         {user && (
-          <>
-            <Button onClick={handleExportCalendar} variant="secondary">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button onClick={handleImportCalendar} variant="secondary">
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-          </>
+          <Button onClick={handleExportCalendar} variant="secondary">
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         )}
         {user ? (
           <DropdownMenu>
