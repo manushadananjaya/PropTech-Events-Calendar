@@ -100,7 +100,12 @@ describe("CalendarHeader", () => {
 
     render(<CalendarHeader />);
 
-    expect(screen.getByAltText("John Doe")).toBeInTheDocument();
+    // Ensure the avatar image and alt text render
+    const avatarImage = screen.getByAltText("John Doe");
+    expect(avatarImage).toBeInTheDocument();
+    expect(avatarImage).toHaveAttribute("src", "http://example.com/avatar.png");
+
+    // Ensure the dropdown contains the user's email
     expect(screen.getByText("johndoe@example.com")).toBeInTheDocument();
   });
 

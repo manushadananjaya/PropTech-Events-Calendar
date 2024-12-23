@@ -33,7 +33,8 @@ import { Event } from "@/types/event";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useSessionContext } from "@/context/SessionContext";
 import { v4 as uuidv4 } from "uuid";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
+
 
 const ACCESS_LEVELS = {
   EDIT: "edit",
@@ -73,8 +74,9 @@ const Calendar: React.FC = () => {
       setEvents(data as Event[]);
       
     } catch (error) {
-      console.error("Error fetching events:", error);
       toast.error("Failed to fetch events.");
+      console.error("Error fetching events:", error);
+      
     }
   }, [currentDate, supabase]);
 
