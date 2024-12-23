@@ -14,10 +14,19 @@ import {
   addMonths,
   subMonths,
   isSameDay,
+  setMonth,
+  setYear,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import EventModal from "./EventModal";
 import EventsList from "./EventsList";
 import { Event } from "@/types/event";
@@ -37,6 +46,16 @@ const Calendar: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const supabase = createClientComponentClient();
+
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: i.toString(),
+    label: format(setMonth(new Date(), i), "MMMM"),
+  }));
+
+  const years = Array.from({ length: 10 }, (_, i) => ({
+    value: (new Date().getFullYear() - 5 + i).toString(),
+    label: (new Date().getFullYear() - 5 + i).toString(),
+  }));
 
   const fetchEvents = useCallback(async () => {
     const startOfMonthDate = startOfMonth(currentDate).toISOString();
@@ -61,6 +80,14 @@ const Calendar: React.FC = () => {
 
   const handlePrevMonth = () => setCurrentDate((prev) => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));
+
+  const handleMonthChange = (value: string) => {
+    setCurrentDate((prev) => setMonth(prev, parseInt(value)));
+  };
+
+  const handleYearChange = (value: string) => {
+    setCurrentDate((prev) => setYear(prev, parseInt(value)));
+  };
 
   const handleDateClick = (date: Date) => {
     if (!user) {
@@ -175,9 +202,43 @@ const Calendar: React.FC = () => {
     <div className="w-full max-w-6xl mx-auto space-y-8">
       <Card className="bg-white/50 backdrop-blur-sm shadow-xl">
         <CardHeader className="flex items-center justify-between pb-2">
-          <CardTitle className="text-3xl font-bold">
-            {format(currentDate, "MMMM yyyy")}
-          </CardTitle>
+          <div className="flex items-center gap-4 py-4">
+            <CardTitle className="text-3xl font-bold">
+              {format(currentDate, "MMMM yyyy")}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Select
+                value={currentDate.getMonth().toString()}
+                onValueChange={handleMonthChange}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={currentDate.getFullYear().toString()}
+                onValueChange={handleYearChange}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((year) => (
+                    <SelectItem key={year.value} value={year.value}>
+                      {year.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="space-x-2">
             <Button variant="outline" size="icon" onClick={handlePrevMonth}>
               <ChevronLeft className="h-4 w-4" />
