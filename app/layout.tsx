@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Azeret_Mono as Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { colors } from "@/lib/theme";
+import { SessionProvider } from "@/context/SessionContext";
 
 
 const geistSans = Geist({
@@ -46,7 +47,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        {" "}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

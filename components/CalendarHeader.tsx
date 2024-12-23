@@ -1,7 +1,7 @@
 // CalendarHeader.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { User } from "@supabase/supabase-js";
+import { useSessionContext } from "@/context/SessionContext";
 import { Calendar, LogOut, Download, Upload, Settings } from "lucide-react";
 import { Event } from "@/types/event";
 import { create } from "zustand";
@@ -35,104 +35,18 @@ export const useUserStore = create<UserStore>((set) => ({
 }));
 
 const CalendarHeader: React.FC = () => {
+  const { user, userRole } = useSessionContext();
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const [user, setUser] = useState<User | null>(null);
-  const { userRole, setUserRole } = useUserStore();
-
-
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-
-  useEffect(() => {
-    const initializeUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        setUser(user);
-        await updateUserRole(user);
-      }
-    };
-
-    const updateUserRole = async (user: User) => {
-      try {
-        const { data: existingUser, error } = await supabase
-          .from("users")
-          .select("id, role")
-          .eq("id", user.id)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          console.error("Error fetching user role:", error);
-          // toast.error("Failed to fetch user role.");
-          return;
-        }
-
-        if (existingUser) {
-          setUserRole(existingUser.role);
-        } else {
-          const { count } = await supabase
-            .from("users")
-            .select("id", { count: "exact" });
-
-          const role = count === 0 ? "admin" : "user";
-
-          const { error: insertError } = await supabase.from("users").insert({
-            id: user.id,
-            email: user.email,
-            role,
-          });
-
-          if (insertError) {
-            console.error("Error inserting new user:", insertError);
-            // toast.error("Failed to create new user.");
-            return;
-          }
-
-          setUserRole(role);
-        }
-      } catch (err) {
-        console.error("Unexpected error handling user role:", err);
-        // toast.error("An unexpected error occurred.");
-      }
-    };
-
-    initializeUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          await updateUserRole(session.user);
-          router.refresh();
-        } else {
-          setUser(null);
-          setUserRole(null);
-          router.refresh();
-        }
-      }
-    );
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase, setUserRole, router]);
 
   const handleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `$${baseUrl}/auth/callback`,
-      },
-    });
+    await supabase.auth.signInWithOAuth({ provider: "google" });
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.refresh();
   };
-
 
   const handleExportCalendar = async () => {
     const { data: events, error } = await supabase.from("events").select("*");
