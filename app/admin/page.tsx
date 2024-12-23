@@ -17,6 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Search } from "lucide-react";
+import CalendarHeader from "@/components/CalendarHeader";
 
 interface User {
   id: string;
@@ -26,9 +31,9 @@ interface User {
 
 const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const supabase = createClientComponentClient();
 
-  // Function to fetch users from the database
   const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -45,7 +50,7 @@ const AdminPanel: React.FC = () => {
   }, [supabase]);
 
   useEffect(() => {
-    fetchUsers(); // Fetch users when the component is mounted
+    fetchUsers();
   }, [fetchUsers]);
 
   const handleUpdateUserRole = async (userId: string, newRole: string) => {
@@ -59,49 +64,75 @@ const AdminPanel: React.FC = () => {
         console.error("Error updating user role:", error.message);
       } else {
         console.log("User role updated successfully.");
-        fetchUsers(); // Refresh user list to reflect changes
+        fetchUsers();
       }
     } catch (err) {
       console.error("Unexpected error updating user role:", err);
     }
   };
 
+  const filteredUsers = users.filter(
+    (user) =>
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Admin Panel</h2>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>{user.role}</TableCell>
-              <TableCell>
-                <Select
-                  value={user.role}
-                  onValueChange={(newRole) =>
-                    handleUpdateUserRole(user.id, newRole)
-                  }
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div>
+      <CalendarHeader />
+    <Card className="w-full max-w-4xl mx-auto mt-8">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold">Admin Panel</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center space-x-2 mb-4">
+          <Search className="w-5 h-5 text-gray-500" />
+          <Input
+            type="text"
+            placeholder="Search users..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-grow"
+          />
+          <Button onClick={fetchUsers}>Refresh</Button>
+        </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[300px]">Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.email}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell className="text-right">
+                    <Select
+                      value={user.role}
+                      onValueChange={(newRole) =>
+                        handleUpdateUserRole(user.id, newRole)
+                      }
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
     </div>
   );
 };
