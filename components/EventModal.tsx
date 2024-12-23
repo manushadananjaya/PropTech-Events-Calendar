@@ -316,6 +316,19 @@ const EventModal: React.FC<EventModalProps> = ({
             )}
           </DialogFooter>
         </form>
+        <div className="mt-4 text-sm">
+          <h4 className="font-semibold mb-2">Access Level Colors:</h4>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="w-4 h-4 bg-green-500 rounded-full"></span>
+              <span>Edit </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="w-4 h-4 bg-blue-500 rounded-full"></span>
+              <span>Read Only </span>
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
