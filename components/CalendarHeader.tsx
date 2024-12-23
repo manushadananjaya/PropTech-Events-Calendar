@@ -37,6 +37,9 @@ const CalendarHeader: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const { userRole, setUserRole } = useUserStore();
 
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+
   useEffect(() => {
     const initializeUser = async () => {
       const {
@@ -115,7 +118,7 @@ const CalendarHeader: React.FC = () => {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `$${baseUrl}/auth/callback`,
       },
     });
   };
