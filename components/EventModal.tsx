@@ -158,7 +158,7 @@ const EventModal: React.FC<EventModalProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-full sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
             {event.id ? "Edit Event" : "Add Event"}
@@ -172,9 +172,11 @@ const EventModal: React.FC<EventModalProps> = ({
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 px-2 sm:px-0">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name" className="text-sm sm:text-base">
+              Name
+            </Label>
             <Input
               id="name"
               name="name"
@@ -182,11 +184,14 @@ const EventModal: React.FC<EventModalProps> = ({
               onChange={handleChange}
               required
               disabled={!canEdit || isLoading}
+              className="text-sm sm:text-base"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="startDate">Start</Label>
+            <Label htmlFor="startDate" className="text-sm sm:text-base">
+              Start
+            </Label>
             <Input
               id="startDate"
               name="startdate"
@@ -195,11 +200,14 @@ const EventModal: React.FC<EventModalProps> = ({
               onChange={handleChange}
               required
               disabled={!canEdit || isLoading}
+              className="text-sm sm:text-base"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="endDate">End</Label>
+            <Label htmlFor="endDate" className="text-sm sm:text-base">
+              End
+            </Label>
             <Input
               id="endDate"
               name="enddate"
@@ -208,34 +216,43 @@ const EventModal: React.FC<EventModalProps> = ({
               onChange={handleChange}
               required
               disabled={!canEdit || isLoading}
+              className="text-sm sm:text-base"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cost">Cost</Label>
+            <Label htmlFor="cost" className="text-sm sm:text-base">
+              Cost
+            </Label>
             <Input
               id="cost"
               name="cost"
               value={editedEvent.cost}
               onChange={handleChange}
               disabled={!canEdit || isLoading}
+              className="text-sm sm:text-base"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
+            <Label htmlFor="location" className="text-sm sm:text-base">
+              Location
+            </Label>
             <Input
               id="location"
               name="location"
               value={editedEvent.location}
               onChange={handleChange}
               disabled={!canEdit || isLoading}
+              className="text-sm sm:text-base"
             />
           </div>
 
           {isAdmin && (
             <div className="space-y-2">
-              <Label htmlFor="accessLevel">Access Level</Label>
+              <Label htmlFor="accessLevel" className="text-sm sm:text-base">
+                Access Level
+              </Label>
               <Select
                 name="accessLevel"
                 value={editedEvent.accessLevel}
@@ -245,6 +262,7 @@ const EventModal: React.FC<EventModalProps> = ({
                   } as React.ChangeEvent<HTMLSelectElement>)
                 }
                 disabled={isLoading}
+                
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select access level" />
@@ -261,8 +279,8 @@ const EventModal: React.FC<EventModalProps> = ({
 
           {editedEvent.attachment && (
             <div className="space-y-2">
-              <Label>Attachment</Label>
-              <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
+              <Label className="text-sm sm:text-base">Attachment</Label>
+              <div className="flex items-center gap-2 bg-muted p-2 rounded-md flex-wrap">
                 <File size={16} />
                 <a
                   href={attachmentUrl || undefined}
@@ -278,13 +296,16 @@ const EventModal: React.FC<EventModalProps> = ({
 
           {canEdit && (
             <div className="space-y-2">
-              <Label htmlFor="file">New Attachment</Label>
+              <Label htmlFor="file" className="text-sm sm:text-base">
+                New Attachment
+              </Label>
               <Input
                 id="file"
                 name="file"
                 type="file"
                 onChange={handleFileChange}
                 disabled={isLoading}
+                className="text-sm sm:text-base"
               />
               {file && (
                 <p className="text-sm text-muted-foreground mt-1">
@@ -294,7 +315,7 @@ const EventModal: React.FC<EventModalProps> = ({
             </div>
           )}
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             {canEdit && (
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -316,16 +337,16 @@ const EventModal: React.FC<EventModalProps> = ({
             )}
           </DialogFooter>
         </form>
-        <div className="mt-4 text-sm">
+        <div className="mt-4 text-sm px-2 sm:px-0">
           <h4 className="font-semibold mb-2">Access Level Colors:</h4>
-          <div className="space-y-2">
+          <div className="flex flex-wrap gap-4">
             <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 bg-green-500 rounded-full"></span>
-              <span>Edit </span>
+              <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+              <span>Edit</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 bg-blue-500 rounded-full"></span>
-              <span>Read Only </span>
+              <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+              <span>Read Only</span>
             </div>
           </div>
         </div>
