@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Azeret_Mono as Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { colors } from "@/lib/theme";
 import { SessionProvider } from "@/context/SessionContext";
 import { Toaster } from "react-hot-toast";
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,33 +20,17 @@ export const metadata: Metadata = {
     "An embeddable calendar for PropTech AG team members and external parties",
 };
 
-// Generate CSS variables dynamically
-const themeStyle = `
-  :root {
-    --color-primary: ${colors.primary};
-    --color-secondary: ${colors.secondary};
-    --color-accent: ${colors.accent};
-    --color-background: ${colors.background};
-    --color-text: ${colors.text};
-  }
-`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        {/* Add inline style for the theme */}
-        <style>{themeStyle}</style>
-      </head>
+    <html lang="en" className="bg-background text-foreground">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        {" "}
         <SessionProvider>{children}</SessionProvider>
         <Toaster />
       </body>
