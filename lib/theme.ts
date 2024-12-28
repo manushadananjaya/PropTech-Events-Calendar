@@ -1,14 +1,14 @@
 export const colors = {
   primary: {
-    DEFAULT: "#1E90FF",
+    DEFAULT: "#071B34",
     foreground: "#F8FAFC",
   },
   secondary: {
-    DEFAULT: "#FF6347",
+    DEFAULT: "#466480",
     foreground: "#F8FAFC",
   },
   accent: {
-    DEFAULT: "#32CD32",
+    DEFAULT: "#466581",
     foreground: "#FFF1F2",
   },
   background: "#F5F5F5",
