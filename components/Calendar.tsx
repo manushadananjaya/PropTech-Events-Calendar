@@ -35,7 +35,6 @@ import { useSessionContext } from "@/context/SessionContext";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-hot-toast";
 
-
 const ACCESS_LEVELS = {
   EDIT: "edit",
   READONLY: "readonly",
@@ -72,11 +71,9 @@ const Calendar: React.FC = () => {
 
       if (error) throw error;
       setEvents(data as Event[]);
-      
     } catch (error) {
       toast.error("Failed to fetch events.");
       console.error("Error fetching events:", error);
-      
     }
   }, [currentDate, supabase]);
 
@@ -210,11 +207,11 @@ const Calendar: React.FC = () => {
   });
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8">
+    <div className="w-full max-w-6xl mx-auto space-y-4 sm:space-y-8 px-4 sm:px-6 lg:px-8">
       <Card className="bg-white/50 backdrop-blur-sm shadow-xl">
-        <CardHeader className="flex items-center justify-between pb-2">
-          <div className="flex items-center gap-4 py-4">
-            <CardTitle className="text-3xl font-bold">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 space-y-4 sm:space-y-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 py-4">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">
               {format(currentDate, "MMMM yyyy")}
             </CardTitle>
             <div className="flex gap-2">
@@ -222,7 +219,7 @@ const Calendar: React.FC = () => {
                 value={currentDate.getMonth().toString()}
                 onValueChange={handleMonthChange}
               >
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[120px] sm:w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,7 +234,7 @@ const Calendar: React.FC = () => {
                 value={currentDate.getFullYear().toString()}
                 onValueChange={handleYearChange}
               >
-                <SelectTrigger className="w-[100px]">
+                <SelectTrigger className="w-[90px] sm:w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -260,7 +257,7 @@ const Calendar: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <div
                 key={day}
@@ -272,17 +269,17 @@ const Calendar: React.FC = () => {
             {days.map((day) => (
               <div
                 key={day.toString()}
-                className={`p-2 border rounded-md ${
+                className={`p-1 sm:p-2 border rounded-md ${
                   isSameMonth(day, currentDate)
                     ? "bg-white"
                     : "bg-gray-100 text-gray-400"
                 } ${isSameDay(day, new Date()) ? "ring-2 ring-blue-500" : ""}`}
                 onClick={() => handleDateClick(day)}
               >
-                <div className="text-right text-sm font-medium">
+                <div className="text-right text-xs sm:text-sm font-medium">
                   {format(day, "d")}
                 </div>
-                <div className="mt-1 space-y-1">
+                <div className="mt-1 space-y-1 hidden sm:block">
                   {events
                     .filter((event) =>
                       isWithinInterval(day, {
@@ -296,7 +293,7 @@ const Calendar: React.FC = () => {
                         key={event.id}
                         className={`text-xs p-1 rounded-sm cursor-pointer ${getEventColor(
                           event
-                        )} text-white truncate`}
+                        )} text-white truncate hidden sm:block`}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEventClick(event);
@@ -311,7 +308,7 @@ const Calendar: React.FC = () => {
           </div>
           {user && (
             <Button
-              className="mt-4"
+              className="mt-4 w-full sm:w-auto"
               onClick={() => handleDateClick(new Date())}
             >
               <Plus className="mr-2 h-4 w-4" /> Add Event
