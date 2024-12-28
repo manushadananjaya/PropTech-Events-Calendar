@@ -15,8 +15,9 @@ import {
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useSessionContext } from "@/context/SessionContext";
-import { Calendar, LogOut, Download, Settings } from "lucide-react";
+import { Calendar, LogOut, Download, Settings, Menu } from "lucide-react";
 import { create } from "zustand";
+import Image from "next/image";
 
 interface UserStore {
   userRole: string | null;
@@ -32,6 +33,7 @@ const CalendarHeader: React.FC = () => {
   const { user, userRole } = useSessionContext();
   const router = useRouter();
   const supabase = createClientComponentClient();
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   const handleSignIn = async () => {
     try {
@@ -118,63 +120,96 @@ END:VCALENDAR`;
     }
   };
 
-
   return (
-    <header className="flex justify-between items-center p-4 bg-primary text-primary-foreground">
-      <div className="flex items-center space-x-2">
+    <header className="flex flex-col sm:flex-row justify-between items-center p-4 bg-primary text-primary-foreground">
+      <div className="flex items-center space-x-2 mb-4 sm:mb-0">
         <Calendar className="h-6 w-6" />
         <h1 className="text-2xl font-bold">PropTech Events Calendar</h1>
       </div>
       <div className="flex items-center space-x-2">
-        {user && userRole === "admin" && (
-          <Button onClick={() => router.push("/admin")} variant="secondary">
-            <Settings className="mr-2 h-4 w-4" />
-            Admin Panel
+        <div className="sm:hidden">
+          <Button variant="ghost" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <Menu className="h-6 w-6" />
           </Button>
-        )}
-        {user && (
-          <Button onClick={handleExportCalendar} variant="secondary">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        )}
-        {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={user.user_metadata.avatar_url}
-                    alt={user.user_metadata.full_name}
-                  />
-                  <AvatarFallback>
-                    {user.user_metadata.full_name?.charAt(0) ||
-                      user.email?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {user.user_metadata.full_name}
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button onClick={handleSignIn}>Sign In</Button>
-        )}
+        </div>
+        <div
+          className={`${
+            isMenuOpen ? "flex" : "hidden"
+          } sm:flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2`}
+        >
+          {user && userRole === "admin" && (
+            <Button
+              onClick={() => router.push("/admin")}
+              variant="secondary"
+              className="w-full sm:w-auto"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Admin Panel
+            </Button>
+          )}
+          {user && (
+            <Button
+              onClick={handleExportCalendar}
+              variant="secondary"
+              className="w-full sm:w-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={user.user_metadata.avatar_url}
+                      alt={user.user_metadata.full_name}
+                    />
+                    <AvatarFallback>
+                      {user.user_metadata.full_name?.charAt(0) ||
+                        user.email?.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      {user.user_metadata.full_name}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              onClick={handleSignIn}
+              className="w-full sm:w-auto flex items-center justify-center"
+            >
+              <Image
+                src="/google-logo.svg"
+                alt="Google Logo"
+                width={20}
+                height={20}
+                className="mr-2"
+              />
+              Sign In with Google
+            </Button>
+          )}
+        </div>
       </div>
     </header>
   );
